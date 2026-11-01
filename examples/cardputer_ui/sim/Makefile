@@ -11,7 +11,7 @@ CC           ?= gcc
 CXXFLAGS ?= -O1 -g
 CXXFLAGS += -std=c++17 -Wall -Wno-unused-function -DLGFX_USE_V1 -DLGFX_LINUX_FB -I$(LGFX_DIR)/src
 CFLAGS   ?= -O1
-CFLAGS   += -I$(LGFX_DIR)/src
+CFLAGS   += -std=gnu17 -I$(LGFX_DIR)/src
 
 CORE_SRC := $(wildcard ../core/*.cpp ../core/screens/*.cpp)
 SIM_SRC  := $(wildcard *.cpp)
