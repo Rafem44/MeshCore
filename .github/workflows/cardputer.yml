@@ -1,0 +1,91 @@
+name: Cardputer ADV
+
+# Builds for the standalone Cardputer ADV + Cap LoRa project (branch cardputer-adv).
+#  - simulator: builds the PC simulator, runs every UI scenario, uploads the screenshots.
+#  - firmware:  builds the PlatformIO envs listed in the matrix, reports RAM/flash,
+#               uploads firmware.bin (OTA/update) and firmware-merged.bin (full flash at 0x0).
+
+on:
+  push:
+    branches: [cardputer-adv, 'cardputer-adv-*', 'claude/**']
+  pull_request:
+    branches: [cardputer-adv]
+  workflow_dispatch:
+
+jobs:
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache LovyanGFX build
+        uses: actions/cache@v5
+        with:
+          path: |
+            examples/cardputer_ui/sim/build/LovyanGFX
+            examples/cardputer_ui/sim/build/lgfx
+            examples/cardputer_ui/sim/build/liblgfx.a
+          key: sim-lgfx-${{ hashFiles('examples/cardputer_ui/sim/Makefile') }}
+
+      - name: Build and run scenarios
+        run: make -C examples/cardputer_ui/sim -j4 run
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshots
+          path: examples/cardputer_ui/sim/build/shots/
+          if-no-files-found: ignore
+
+  firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          # Reference build on an existing ESP32-S3 + SX1262 board, proves the toolchain works.
+          # The Cardputer envs are added here in phase 1.
+          - Heltec_v3_companion_radio_ble
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Build Environment
+        uses: ./.github/actions/setup-build-environment
+
+      - name: Build ${{ matrix.environment }}
+        run: pio run -e ${{ matrix.environment }} | tee build.log
+
+      - name: Merge flash image
+        run: pio run -e ${{ matrix.environment }} -t mergebin
+
+      - name: Memory report
+        run: |
+          RAM=$(grep -E '^RAM:' build.log | tail -1)
+          FLASH=$(grep -E '^Flash:' build.log | tail -1)
+          PCT=$(echo "$RAM" | grep -oE '[0-9]+\.[0-9]+%' | head -1 | tr -d '%')
+          {
+            echo "### ${{ matrix.environment }}"
+            echo '```'
+            echo "$RAM"
+            echo "$FLASH"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$RAM"; echo "$FLASH"
+          if [ -n "$PCT" ] && awk "BEGIN{exit !($PCT > 70)}"; then
+            echo "::warning title=RAM budget::${{ matrix.environment }} uses ${PCT}% static RAM (budget 70%)"
+            echo "**Warning: static RAM above the 70% budget.**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Collect binaries
+        run: |
+          mkdir -p out
+          cp .pio/build/${{ matrix.environment }}/firmware.bin out/${{ matrix.environment }}.bin
+          cp .pio/build/${{ matrix.environment }}/firmware-merged.bin out/${{ matrix.environment }}-merged.bin
+          cp build.log out/${{ matrix.environment }}-build.log
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.environment }}
+          path: out/
