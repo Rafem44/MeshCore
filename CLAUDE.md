@@ -57,7 +57,8 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 1. Bring-up matériel (variante, radio, PI4IOE, écran, companion BLE) — compile, à valider sur matériel.
 2. Clavier TCA8418 + squelette d'UI (accueil, barre d'état, réglages) — compile + simulateur OK,
    à valider sur matériel. Checklist : examples/cardputer_ui/TESTS.md.
-3. Messagerie autonome + persistance LittleFS + son.
+3. Messagerie autonome + persistance LittleFS + son — compile + simulateur OK, à valider sur matériel.
+   core/MessageStore (historique, partagé sim/appareil), device/CardputerMesh (BaseChatMesh, ACK, 3 essais).
 4. GPS et boussole.
 5. Cartes hors ligne (tuiles RGB565 sur SD).
 6. Finitions, veille, export/import config, rebase upstream.

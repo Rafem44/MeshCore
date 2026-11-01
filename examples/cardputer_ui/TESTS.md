@@ -39,3 +39,25 @@ que le firmware a détecté.
 - [ ] Veille écran à 15 s : l'écran s'éteint, une touche le rallume (sans exécuter la touche).
 - [ ] Réglages > Système : la mémoire libre et le temps « Allumé depuis » se mettent à jour.
 - [ ] Laisser tourner 1 h : dans le log, la ligne `heap free ... min ...` toutes les minutes ne baisse pas régulièrement.
+
+## Phase 3 — messagerie autonome (`cardputer_adv_standalone`)
+
+Il faut un **second nœud MeshCore** (téléphone + appli avec un autre appareil, ou un autre Cardputer).
+
+- [ ] Au démarrage, le log contient `mesh ready: ... contacts` puis, 3 s après, `advert sent (flood)`.
+      Premier démarrage : `new identity created (saved)`.
+- [ ] Le second nœud voit apparaître le Cardputer dans ses contacts (avec le nom choisi dans Réglages).
+- [ ] Quand le second nœud s'annonce, un bandeau « Nouveau contact » apparaît et il est listé dans `C`.
+- [ ] Message reçu du second nœud : bandeau + double bip, pastille orange sur l'accueil, compteur `*1` en haut.
+- [ ] `M` → la conversation est en haut de la liste ; Entrée l'ouvre ; la pastille disparaît.
+- [ ] Répondre (texte avec accents Alt+e…) : la bulle passe de « envoyé » à « reçu » (vert) en quelques secondes.
+- [ ] Éteindre le second nœud et envoyer : « renvoyé » puis « échec » (rouge) au bout de ~30 s, bandeau + son grave.
+- [ ] Canal Public : un message envoyé depuis l'appli sur Public arrive dans « Public » avec le nom de l'expéditeur.
+- [ ] `J` puis `test` (devient `#test`) ; rejoindre le même canal `#test` dans l'appli : les messages passent
+      dans les deux sens. **À vérifier : la clé des canaux #nom doit être la même que celle de l'appli.**
+- [ ] Contacts : `F` met en favori (étoile, remonte en haut), `D` deux fois supprime.
+- [ ] Fiche contact (Entrée) : chemin, « entendu il y a… ». Avec position du contact et GPS : distance et cap.
+- [ ] 20 messages échangés dans les deux sens sans erreur ; statut « reçu » sur chacun.
+- [ ] Éteindre / rallumer : conversations, messages, contacts et canaux toujours là (log `contacts loaded`).
+- [ ] Écran en veille : un message reçu rallume l'écran avec le bandeau.
+- [ ] Laisser tourner 1 h avec du trafic : la ligne `heap free ... min ...` du log reste stable.
