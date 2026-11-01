@@ -17,8 +17,8 @@ static bool radioReady = false;
 
 static DeviceSettings settings;
 static DeviceSystem sys(settings);
-static DeviceMeshStub mesh(settings, radioReady);
-static App app(Services{&mesh, &sys, &settings}, canvas);
+static DeviceMeshStub meshService(settings, radioReady);
+static App app(Services{&meshService, &sys, &settings}, canvas);
 
 static PlaceholderScreen messagesScreen("Messages", "Phase 3 : messagerie");
 static PlaceholderScreen contactsScreen("Contacts", "Phase 3 : messagerie");
