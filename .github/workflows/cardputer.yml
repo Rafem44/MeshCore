@@ -1,7 +1,7 @@
 name: Cardputer ADV
 
 # Builds for the standalone Cardputer ADV + Cap LoRa project (branch cardputer-adv).
-#  - release:   on a "cardputer-vX.Y.Z" tag, publishes the full-flash images as a GitHub Release.
+#  - release:   when a "cardputer-vX.Y.Z" release is published on GitHub, attaches the full-flash images.
 #  - simulator: builds the PC simulator, runs every UI scenario, uploads the screenshots.
 #  - firmware:  builds the PlatformIO envs listed in the matrix, reports RAM/flash,
 #               uploads firmware.bin (OTA/update) and firmware-merged.bin (full flash at 0x0).
@@ -9,9 +9,8 @@ name: Cardputer ADV
 on:
   push:
     branches: [cardputer-adv, 'cardputer-adv-*', 'claude/**']
-    tags: ['cardputer-v*']   # a tag publishes a GitHub Release with the firmware files
   release:
-    types: [published]       # or publish a release from the GitHub site with a new cardputer-v* tag
+    types: [published]       # publish a release from the GitHub site with a new cardputer-v* tag
   pull_request:
     branches: [cardputer-adv]
   workflow_dispatch:
