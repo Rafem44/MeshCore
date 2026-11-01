@@ -1,10 +1,19 @@
 #include "SimServices.h"
+#include "../core/RadioPresets.h"
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
 
 void SimSystem::beep(uint16_t freqHz, uint16_t durationMs) {
   printf("[SIM] beep %u Hz %u ms\n", freqHz, durationMs);
+}
+
+bool SimSettings::save(const UiSettings& n) {
+  s = n;
+  saves++;
+  printf("[SIM] settings saved: name='%s' preset=%u tx=%d tz=%d timeout=%u sound=%d ble=%d\n", s.nodeName,
+         s.radioPreset, s.txPowerDbm, s.utcOffsetMinutes, s.screenTimeoutSecs, s.sound, s.ble);
+  return true;
 }
 
 static void copyStr(char* dst, size_t n, const std::string& s) {
@@ -71,12 +80,14 @@ int SimMesh::neighbours(NeighbourInfo* out, int max) {
 }
 
 RadioStats SimMesh::radioStats() {
+  const UiSettings& s = _settings.get();
+  const RadioPreset& p = RADIO_PRESETS[s.radioPreset < RADIO_PRESET_COUNT ? s.radioPreset : 0];
   RadioStats r;
   r.rxPackets = _rx;
-  r.freqMHz = 869.618f;   // MeshCore EU/UK narrow default
-  r.bandwidthKHz = 62.5f;
-  r.spreadingFactor = 8;
-  r.txPowerDbm = 22;
+  r.freqMHz = p.freqMHz;
+  r.bandwidthKHz = p.bwKHz;
+  r.spreadingFactor = p.sf;
+  r.txPowerDbm = s.txPowerDbm;
   r.lastSnr = 6.5f;
   r.lastRssi = -92;
   return r;

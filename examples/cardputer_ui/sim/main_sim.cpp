@@ -7,13 +7,15 @@
 //
 // Scenario commands (one per line; lines starting with '#' are comments):
 //   wait <ms>                      advance the virtual clock (UI loop runs every 20 ms)
-//   key <k>                        one key press: a char, or enter|esc|bksp|tab|up|down|left|right|space,
-//                                  optional prefixes fn+ shift+ ctrl+ alt+   (e.g. key fn+;)
+//   key <k>[*N]                    one key press (N times): a char, or enter|esc|bksp|tab|up|down|left|right|space,
+//                                  optional prefixes fn+ shift+ ctrl+ alt+   (e.g. key fn+;  key bksp*5)
 //   type <text>                    type each character of <text>
 //   rx <from> <text...>            receive a direct message
 //   rxch <channel> <from> <text>   receive a channel message (shown as "#channel from: text")
 //   hear <name> <snr>              a neighbour advert is heard
-//   name <self name>               set this node's name
+//   tca <row> <col> [down|up]      raw Cardputer ADV key through the TCA8418 decoding (KeyMatrix),
+//                                  row 0..3 / col 0..13 of the physical keyboard; default = press+release
+//   name <self name>               set this node's name (without going through the settings screen)
 //   battery <pct> [charging]
 //   gps fix <sats> | gps nofix
 //   ble on|off|connected
@@ -21,8 +23,11 @@
 //   shot <name>                    write <output_dir>/<name>.png
 //   expect-screen <title>          fail (exit 1) if the current screen title differs
 //   expect-unread <n>              fail if the unread counter differs
+//   expect-setting <field> <value> name|preset|tx|tz|timeout|sound|ble (tz in minutes, bools 0/1)
 #include "../core/App.h"
 #include "../core/screens/HomeScreen.h"
+#include "../core/screens/SettingsScreens.h"
+#include "../core/KeyMatrix.h"
 #include "SimServices.h"
 #include "PngWriter.h"
 
@@ -112,16 +117,21 @@ int main(int argc, char** argv) {
   }
 
   SimSystem sys;
-  SimMesh mesh(sys);
-  Services svc{&mesh, &sys};
+  SimSettings settings;
+  strcpy(settings.s.nodeName, "Cardputer-Sim");
+  SimMesh mesh(sys, settings);
+  Services svc{&mesh, &sys, &settings};
   App app(svc, g_canvas);
+  KeyMatrix matrix;
 
   PlaceholderScreen messages("Messages", "Phase 3 : messagerie");
   PlaceholderScreen contacts("Contacts", "Phase 3 : messagerie");
   PlaceholderScreen gps("GPS", "Phase 4 : GPS et boussole");
   PlaceholderScreen map("Carte", "Phase 5 : cartes hors ligne");
-  PlaceholderScreen settings("Réglages", "Phase 2 : clavier et UI");
-  HomeScreen home(&messages, &contacts, &gps, &map, &settings);
+  TextInputScreen textInput;
+  SystemScreen systemScreen;
+  SettingsScreen settingsScreen(textInput, systemScreen);
+  HomeScreen home(&messages, &contacts, &gps, &map, &settingsScreen);
   app.begin(&home);
 
   auto runFor = [&](uint32_t ms) {
@@ -156,10 +166,12 @@ int main(int argc, char** argv) {
       uint32_t ms = 0; ls >> ms; runFor(ms);
     } else if (cmd == "key") {
       std::string k; ls >> k;
+      int times = 1;
+      size_t star = k.rfind('*');
+      if (star != std::string::npos && star > 0 && star + 1 < k.size()) { times = atoi(k.c_str() + star + 1); k = k.substr(0, star); }
       KeyEvent e;
       if (!parseKey(k, e)) { fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, k.c_str()); g_failures++; continue; }
-      app.handleKey(e);
-      runFor(LOOP_MS);
+      for (int i = 0; i < times; i++) { app.handleKey(e); runFor(LOOP_MS); }
     } else if (cmd == "type") {
       std::string t = rest(ls);
       for (char c : t) { KeyEvent e; e.code = KeyCode::Char; e.ch = c; app.handleKey(e); runFor(LOOP_MS); }
@@ -169,8 +181,18 @@ int main(int argc, char** argv) {
       std::string ch, from; ls >> ch >> from; mesh.receive(from, ch, rest(ls), true); runFor(LOOP_MS);
     } else if (cmd == "hear") {
       std::string n; float snr = 0; ls >> n >> snr; mesh.hear(n, snr); runFor(LOOP_MS);
+    } else if (cmd == "tca") {
+      int r = -1, c = -1; std::string mode; ls >> r >> c >> mode;
+      uint8_t k = KeyMatrix::fromGrid(r, c);
+      if (!k) { fprintf(stderr, "line %d: no key at %d,%d\n", lineNo, r, c); g_failures++; continue; }
+      KeyEvent e;
+      if (mode != "up" && matrix.feed(0x80 | k, e)) app.handleKey(e);
+      if (mode != "down" && matrix.feed(k, e)) app.handleKey(e);
+      runFor(LOOP_MS);
     } else if (cmd == "name") {
-      mesh.setName(rest(ls)); app.invalidate(); runFor(LOOP_MS);
+      UiSettings s = settings.get(); std::string n = rest(ls);
+      strncpy(s.nodeName, n.c_str(), sizeof(s.nodeName) - 1); s.nodeName[sizeof(s.nodeName) - 1] = 0;
+      settings.save(s); app.invalidate(); runFor(LOOP_MS);
     } else if (cmd == "battery") {
       std::string c; ls >> sys.st.batteryPercent >> c; sys.st.charging = (c == "charging"); app.invalidate(); runFor(LOOP_MS);
     } else if (cmd == "gps") {
@@ -198,6 +220,19 @@ int main(int argc, char** argv) {
       int want = 0; ls >> want;
       int got = mesh.unreadCount();
       if (want != got) { fprintf(stderr, "line %d: FAIL expected %d unread, got %d\n", lineNo, want, got); g_failures++; }
+    } else if (cmd == "expect-setting") {
+      std::string field; ls >> field; std::string want = rest(ls);
+      const UiSettings& s = settings.get();
+      std::string got;
+      if (field == "name") got = s.nodeName;
+      else if (field == "preset") got = std::to_string(s.radioPreset);
+      else if (field == "tx") got = std::to_string(s.txPowerDbm);
+      else if (field == "tz") got = std::to_string(s.utcOffsetMinutes);
+      else if (field == "timeout") got = std::to_string(s.screenTimeoutSecs);
+      else if (field == "sound") got = std::to_string(s.sound);
+      else if (field == "ble") got = std::to_string(s.ble);
+      else got = "<unknown field>";
+      if (want != got) { fprintf(stderr, "line %d: FAIL setting %s expected '%s', got '%s'\n", lineNo, field.c_str(), want.c_str(), got.c_str()); g_failures++; }
     } else {
       fprintf(stderr, "line %d: unknown command '%s'\n", lineNo, cmd.c_str());
       g_failures++;

@@ -40,7 +40,7 @@ static void sectionTitle(lgfx::LovyanGFX& g, const char* text, int y) {
 
 void HomeScreen::draw(App& app, lgfx::LovyanGFX& g) {
   MeshService& mesh = *app.services().mesh;
-  DeviceStatus st = app.services().sys->status();
+  const int utcOffset = app.services().settings->get().utcOffsetMinutes;
   char line[128], fitted[128];
   int y = CONTENT_Y + 1;
 
@@ -69,7 +69,7 @@ void HomeScreen::draw(App& app, lgfx::LovyanGFX& g) {
     y += LINE_H;
   }
   for (int i = 0; i < n; i++) {
-    uint32_t t = msgs[i].timestamp + st.utcOffsetMinutes * 60;
+    uint32_t t = msgs[i].timestamp + utcOffset * 60;
     snprintf(line, sizeof(line), "%02u:%02u", (unsigned)((t / 3600) % 24), (unsigned)((t / 60) % 60));
     g.setTextColor(DIM);
     g.drawString(line, MARGIN, y);

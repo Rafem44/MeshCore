@@ -14,7 +14,6 @@ struct DeviceStatus {
   bool bleEnabled = false;
   bool bleConnected = false;
   uint32_t unixTime = 0;      // 0 = time not known yet (no GPS fix, no phone sync)
-  int  utcOffsetMinutes = 60; // local time offset, from settings
 };
 
 struct RadioStats {
@@ -60,10 +59,33 @@ public:
   virtual uint32_t millis() = 0;
   virtual DeviceStatus status() = 0;
   virtual uint32_t freeHeap() = 0;
+  virtual uint32_t minFreeHeap() = 0;          // lowest free heap since boot
+  virtual uint16_t batteryMilliVolts() = 0;
+  virtual const char* firmwareVersion() = 0;
   virtual void beep(uint16_t freqHz, uint16_t durationMs) = 0;
+};
+
+// User settings edited on the device. Persisted by the platform (LittleFS on the Cardputer).
+struct UiSettings {
+  char nodeName[32] = "Cardputer";
+  uint8_t radioPreset = 0;          // index in RADIO_PRESETS (core/RadioPresets.h)
+  int8_t txPowerDbm = 22;
+  int16_t utcOffsetMinutes = 60;    // France: +60 in winter, +120 in summer
+  uint16_t screenTimeoutSecs = 60;  // 0 = never
+  bool sound = true;
+  bool ble = false;
+};
+
+class SettingsService {
+public:
+  virtual ~SettingsService() {}
+  virtual const UiSettings& get() = 0;
+  // Stores and applies the new settings (radio parameters, name...). Returns false on error.
+  virtual bool save(const UiSettings& s) = 0;
 };
 
 struct Services {
   MeshService* mesh;
   SystemService* sys;
+  SettingsService* settings;
 };

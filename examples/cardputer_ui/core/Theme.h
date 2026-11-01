@@ -1,9 +1,15 @@
 #pragma once
 // Layout, colours and fonts for the 240x135 ST7789 screen.
-#ifndef LGFX_USE_V1
-  #define LGFX_USE_V1
+// On the Cardputer the graphics library is M5GFX (LovyanGFX fork bundled with M5Unified);
+// the simulator uses upstream LovyanGFX. Both expose the same lgfx:: API.
+#if defined(ARDUINO)
+  #include <M5GFX.h>
+#else
+  #ifndef LGFX_USE_V1
+    #define LGFX_USE_V1
+  #endif
+  #include <LovyanGFX.hpp>
 #endif
-#include <LovyanGFX.hpp>
 
 namespace theme {
 

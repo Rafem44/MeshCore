@@ -65,7 +65,7 @@ void App::drawStatusBar() {
   // Left: local time (from GPS / phone), or --:--
   char buf[24];
   if (st.unixTime) {
-    uint32_t t = st.unixTime + st.utcOffsetMinutes * 60;
+    uint32_t t = st.unixTime + _svc.settings->get().utcOffsetMinutes * 60;
     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)((t / 3600) % 24), (unsigned)((t / 60) % 60));
   } else {
     snprintf(buf, sizeof(buf), "--:--");

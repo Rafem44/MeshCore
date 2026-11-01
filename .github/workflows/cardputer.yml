@@ -45,6 +45,7 @@ jobs:
       matrix:
         environment:
           - cardputer_adv_companion_ble
+          - cardputer_adv_standalone
     steps:
       - uses: actions/checkout@v6
 
