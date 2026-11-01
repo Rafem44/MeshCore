@@ -123,6 +123,7 @@ jobs:
         with:
           name: "Cardputer ${{ github.ref_name }}"
           prerelease: true
+          append_body: true   # keep the notes written on the release page, add the file list below
           files: release/*.bin
           body: |
             Firmwares pour M5Stack Cardputer ADV. Fichiers à flasher **à l'adresse 0x0**
