@@ -1,5 +1,6 @@
 #include "Widgets.h"
 #include <string.h>
+#include <stdio.h>
 
 using namespace theme;
 
@@ -120,4 +121,80 @@ bool composeAccent(char* s, size_t cap, char base) {
   char f[3];
   if (isUpper) upper(cyc->forms[0], f); else { f[0] = cyc->forms[0][0]; f[1] = cyc->forms[0][1]; f[2] = 0; }
   return utf8Append(s, cap, f);
+}
+
+// ---------------------------------------------------------------- time formatting
+
+void formatClock(uint32_t unix, int utcOffsetMin, char* out, size_t n) {
+  if (!clockValid(unix)) { snprintf(out, n, "--:--"); return; }
+  uint32_t t = unix + utcOffsetMin * 60;
+  snprintf(out, n, "%02u:%02u", (unsigned)((t / 3600) % 24), (unsigned)((t / 60) % 60));
+}
+
+void formatAgo(uint32_t secs, char* out, size_t n) {
+  if (secs < 60) snprintf(out, n, "%u s", (unsigned)secs);
+  else if (secs < 3600) snprintf(out, n, "%u min", (unsigned)(secs / 60));
+  else if (secs < 86400) snprintf(out, n, "%u h", (unsigned)(secs / 3600));
+  else snprintf(out, n, "%u j", (unsigned)(secs / 86400));
+}
+
+static void civilDate(uint32_t days, int& d, int& m) {
+  // days since 1970-01-01 -> day/month (Howard Hinnant's algorithm)
+  int32_t z = (int32_t)days + 719468;
+  int32_t era = z / 146097;
+  uint32_t doe = z - era * 146097;
+  uint32_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  uint32_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  uint32_t mp = (5 * doy + 2) / 153;
+  d = doy - (153 * mp + 2) / 5 + 1;
+  m = mp < 10 ? mp + 3 : mp - 9;
+}
+
+void formatWhen(uint32_t unix, uint32_t now, int utcOffsetMin, char* out, size_t n) {
+  if (!clockValid(unix)) { snprintf(out, n, "--:--"); return; }
+  uint32_t lt = unix + utcOffsetMin * 60, ln = now + utcOffsetMin * 60;
+  if (!clockValid(now) || lt / 86400 == ln / 86400) { formatClock(unix, utcOffsetMin, out, n); return; }
+  int d, m;
+  civilDate(lt / 86400, d, m);
+  snprintf(out, n, "%02d/%02d", d, m);
+}
+
+// ---------------------------------------------------------------- word wrap
+
+static int textWidthN(lgfx::LovyanGFX& g, const char* s, int len) {
+  char buf[MSG_WRAP_BUF];
+  if (len >= (int)sizeof(buf)) len = sizeof(buf) - 1;
+  memcpy(buf, s, len);
+  buf[len] = 0;
+  return g.textWidth(buf);
+}
+
+int wrapText(lgfx::LovyanGFX& g, const char* text, int width, TextLine* lines, int maxLines) {
+  int count = 0;
+  int pos = 0;
+  const int total = strlen(text);
+  while (pos < total && count < maxLines) {
+    while (pos < total && text[pos] == ' ') pos++;   // no leading spaces on a line
+    if (pos >= total) break;
+    int lastSpace = -1, i = pos, fit = pos;
+    while (i < total) {
+      int next = i + 1;
+      while (next < total && (text[next] & 0xC0) == 0x80) next++;   // whole code point
+      if (text[i] == '\n') break;
+      if (textWidthN(g, text + pos, next - pos) > width) break;
+      if (text[i] == ' ') lastSpace = i;
+      i = next;
+      fit = i;
+    }
+    int end;
+    if (fit >= total || text[fit] == '\n') end = fit;
+    else if (lastSpace > pos) end = lastSpace;
+    else end = fit > pos ? fit : pos + 1;   // word longer than a line: hard break
+    lines[count].start = pos;
+    lines[count].len = end - pos;
+    count++;
+    pos = end;
+    if (pos < total && (text[pos] == ' ' || text[pos] == '\n')) pos++;
+  }
+  return count;
 }

@@ -9,10 +9,16 @@
 //   wait <ms>                      advance the virtual clock (UI loop runs every 20 ms)
 //   key <k>[*N]                    one key press (N times): a char, or enter|esc|bksp|tab|up|down|left|right|space,
 //                                  optional prefixes fn+ shift+ ctrl+ alt+   (e.g. key fn+;  key bksp*5)
-//   type <text>                    type each character of <text>
-//   rx <from> <text...>            receive a direct message
-//   rxch <channel> <from> <text>   receive a channel message (shown as "#channel from: text")
-//   hear <name> <snr>              a neighbour advert is heard
+//   type <text>                    type each character of <text> (everything after "type ", spaces included)
+//   rx <from> <text...>            receive a direct message (creates the contact if unknown)
+//   rxch <channel> <from> <text>   receive a message on a joined channel (e.g. Public)
+//   hear <name> <snr>              a neighbour advert is heard (new contact => notification)
+//   rxburst <from> <n>             receive n numbered direct messages ("message 1".."message n"), 1 s apart
+//   contact <name> [hops] [fav] [repeater|room] [pos <lat> <lon>]   add a known contact (hops -1 = no path)
+//   net ack on|off                 contacts acknowledge direct messages (off => retries then failure)
+//   net delay <ms>                 ACK round trip;  net busy on|off: the radio refuses to send
+//   reboot                         flush and reload the message store from disk, back to the home screen
+//   pos <lat> <lon> | pos none     own position (contact distance / bearing)
 //   tca <row> <col> [down|up]      raw Cardputer ADV key through the TCA8418 decoding (KeyMatrix),
 //                                  row 0..3 / col 0..13 of the physical keyboard; default = press+release
 //   name <self name>               set this node's name (without going through the settings screen)
@@ -24,9 +30,15 @@
 //   expect-screen <title>          fail (exit 1) if the current screen title differs
 //   expect-unread <n>              fail if the unread counter differs
 //   expect-setting <field> <value> name|preset|tx|tz|timeout|sound|ble (tz in minutes, bools 0/1)
+//   expect-convs <n>               number of conversations
+//   expect-msgs <conv> <n>         number of stored messages in a conversation (by name)
+//   expect-last <conv> <state> [text...]  state of the newest message: received|pending|sent|delivered|failed|channel
+//   expect-contacts <n>            number of contacts
+//   expect-sounds <n>              number of notification sounds played so far
 #include "../core/App.h"
 #include "../core/screens/HomeScreen.h"
 #include "../core/screens/SettingsScreens.h"
+#include "../core/screens/MessagingScreens.h"
 #include "../core/KeyMatrix.h"
 #include "SimServices.h"
 #include "PngWriter.h"
@@ -116,27 +128,38 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+  // Fresh storage directory per scenario: build/simfs/<scenario name>
+  std::string scen = strcmp(argv[1], "-") ? argv[1] : "stdin";
+  scen = scen.substr(scen.find_last_of('/') + 1);
+  std::string fsDir = outDir + "/../simfs/" + scen;
+  std::string cmdline = "rm -rf '" + fsDir + "' && mkdir -p '" + fsDir + "'";
+  if (system(cmdline.c_str()) != 0) { fprintf(stderr, "cannot create %s\n", fsDir.c_str()); return 2; }
+  SimStorage storage(fsDir);
+
   SimSystem sys;
   SimSettings settings;
   strcpy(settings.s.nodeName, "Cardputer-Sim");
-  SimMesh mesh(sys, settings);
+  SimMesh mesh(sys, settings, storage);
   Services svc{&mesh, &sys, &settings};
   App app(svc, g_canvas);
   KeyMatrix matrix;
 
-  PlaceholderScreen messages("Messages", "Phase 3 : messagerie");
-  PlaceholderScreen contacts("Contacts", "Phase 3 : messagerie");
+  TextInputScreen textInput;
+  ChatScreen chat;
+  ContactDetailScreen contactDetail(chat);
+  ContactsScreen contacts(chat, contactDetail);
+  ConversationsScreen conversations(chat, contacts, textInput);
   PlaceholderScreen gps("GPS", "Phase 4 : GPS et boussole");
   PlaceholderScreen map("Carte", "Phase 5 : cartes hors ligne");
-  TextInputScreen textInput;
   SystemScreen systemScreen;
   SettingsScreen settingsScreen(textInput, systemScreen);
-  HomeScreen home(&messages, &contacts, &gps, &map, &settingsScreen);
+  HomeScreen home(&conversations, &contacts, &gps, &map, &settingsScreen);
   app.begin(&home);
 
   auto runFor = [&](uint32_t ms) {
     uint32_t end = sys.virtualMillis + ms;
     do {
+      mesh.tick();
       if (app.loop()) g_frames++;
       if (sys.virtualMillis >= end) break;
       sys.virtualMillis += LOOP_MS;
@@ -173,12 +196,40 @@ int main(int argc, char** argv) {
       if (!parseKey(k, e)) { fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, k.c_str()); g_failures++; continue; }
       for (int i = 0; i < times; i++) { app.handleKey(e); runFor(LOOP_MS); }
     } else if (cmd == "type") {
-      std::string t = rest(ls);
+      std::string t = line.substr(line.find("type") + 4);
+      if (!t.empty() && t[0] == ' ') t.erase(0, 1);
       for (char c : t) { KeyEvent e; e.code = KeyCode::Char; e.ch = c; app.handleKey(e); runFor(LOOP_MS); }
     } else if (cmd == "rx") {
-      std::string from; ls >> from; mesh.receive(from, from, rest(ls), false); runFor(LOOP_MS);
+      std::string from; ls >> from; mesh.receive(from, rest(ls)); runFor(LOOP_MS);
     } else if (cmd == "rxch") {
-      std::string ch, from; ls >> ch >> from; mesh.receive(from, ch, rest(ls), true); runFor(LOOP_MS);
+      std::string ch, from; ls >> ch >> from; mesh.receiveChannel(ch, from, rest(ls)); runFor(LOOP_MS);
+    } else if (cmd == "rxburst") {
+      std::string from; int n = 0; ls >> from >> n;
+      for (int i = 1; i <= n; i++) { mesh.receive(from, "message " + std::to_string(i)); runFor(1000); }
+    } else if (cmd == "contact") {
+      std::string name, w; ls >> name;
+      int hops = 1; bool fav = false, hasPos = false; uint8_t type = CONTACT_CHAT; double lat = 0, lon = 0;
+      if (ls >> hops) {
+        while (ls >> w) {
+          if (w == "fav") fav = true;
+          else if (w == "repeater") type = CONTACT_REPEATER;
+          else if (w == "room") type = CONTACT_ROOM;
+          else if (w == "pos") { ls >> lat >> lon; hasPos = true; }
+        }
+      }
+      mesh.addContact(name, hops, fav, type, hasPos, lat, lon); app.invalidate(); runFor(LOOP_MS);
+    } else if (cmd == "net") {
+      std::string what, v; ls >> what >> v;
+      if (what == "ack") mesh.netAcks = (v == "on");
+      else if (what == "delay") mesh.netDelayMs = atoi(v.c_str());
+      else if (what == "busy") mesh.radioBusy = (v == "on");
+    } else if (cmd == "reboot") {
+      mesh.reboot(); app.begin(&home); runFor(LOOP_MS);
+    } else if (cmd == "pos") {
+      std::string a; ls >> a;
+      if (a == "none") sys.st.hasPosition = false;
+      else { sys.st.lat = atof(a.c_str()); ls >> sys.st.lon; sys.st.hasPosition = true; }
+      app.invalidate(); runFor(LOOP_MS);
     } else if (cmd == "hear") {
       std::string n; float snr = 0; ls >> n >> snr; mesh.hear(n, snr); runFor(LOOP_MS);
     } else if (cmd == "tca") {
@@ -233,6 +284,34 @@ int main(int argc, char** argv) {
       else if (field == "ble") got = std::to_string(s.ble);
       else got = "<unknown field>";
       if (want != got) { fprintf(stderr, "line %d: FAIL setting %s expected '%s', got '%s'\n", lineNo, field.c_str(), want.c_str(), got.c_str()); g_failures++; }
+    } else if (cmd == "expect-convs") {
+      int want = 0; ls >> want;
+      if (want != mesh.messages().count()) { fprintf(stderr, "line %d: FAIL expected %d conversations, got %d\n", lineNo, want, mesh.messages().count()); g_failures++; }
+    } else if (cmd == "expect-contacts") {
+      int want = 0; ls >> want;
+      if (want != mesh.contactCount()) { fprintf(stderr, "line %d: FAIL expected %d contacts, got %d\n", lineNo, want, mesh.contactCount()); g_failures++; }
+    } else if (cmd == "expect-sounds") {
+      int want = 0; ls >> want;
+      if (want != sys.sounds) { fprintf(stderr, "line %d: FAIL expected %d sounds, got %d\n", lineNo, want, sys.sounds); g_failures++; }
+    } else if (cmd == "expect-msgs") {
+      std::string conv; int want = 0; ls >> conv >> want;
+      ConvKey k = mesh.keyByName(conv);
+      int got = k.valid() ? (int)mesh.messages().total(k) : -1;
+      if (want != got) { fprintf(stderr, "line %d: FAIL expected %d messages in %s, got %d\n", lineNo, want, conv.c_str(), got); g_failures++; }
+    } else if (cmd == "expect-last") {
+      std::string conv, state; ls >> conv >> state; std::string text = rest(ls);
+      static const char* const names[] = {"received", "pending", "sent", "sent", "delivered", "failed", "channel"};
+      ConvKey k = mesh.keyByName(conv);
+      StoredMsg m;
+      if (!k.valid() || mesh.messages().loadRecent(k, &m, 1, 0) != 1) {
+        fprintf(stderr, "line %d: FAIL no message in %s\n", lineNo, conv.c_str()); g_failures++;
+      } else {
+        std::string got = m.state < 7 ? names[m.state] : "?";
+        if (got != state || (!text.empty() && text != m.text)) {
+          fprintf(stderr, "line %d: FAIL last of %s: expected %s '%s', got %s '%s'\n", lineNo, conv.c_str(), state.c_str(), text.c_str(), got.c_str(), m.text);
+          g_failures++;
+        }
+      }
     } else {
       fprintf(stderr, "line %d: unknown command '%s'\n", lineNo, cmd.c_str());
       g_failures++;

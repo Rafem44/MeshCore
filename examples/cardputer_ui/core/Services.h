@@ -5,6 +5,7 @@
 // The UI must never include Arduino, RadioLib or MeshCore headers directly.
 #include <stdint.h>
 #include <stddef.h>
+#include "MessageStore.h"
 
 struct DeviceStatus {
   int  batteryPercent = -1;   // -1 = unknown
@@ -14,6 +15,8 @@ struct DeviceStatus {
   bool bleEnabled = false;
   bool bleConnected = false;
   uint32_t unixTime = 0;      // 0 = time not known yet (no GPS fix, no phone sync)
+  bool hasPosition = false;   // own position (GPS fix or manual)
+  double lat = 0, lon = 0;
 };
 
 struct RadioStats {
@@ -34,24 +37,62 @@ struct NeighbourInfo {
   uint32_t lastHeardSecs;     // seconds since last heard
 };
 
-struct MessagePreview {
-  char from[32];              // contact name, or channel name for group messages
-  char text[96];              // UTF-8, possibly truncated
-  uint32_t timestamp;         // unix time
-  bool isChannel;
-  bool unread;
+enum ContactType : uint8_t { CONTACT_CHAT = 1, CONTACT_REPEATER = 2, CONTACT_ROOM = 3, CONTACT_SENSOR = 4 };
+
+struct ContactView {
+  ConvKey key;                // DIRECT + public key prefix: also the conversation key
+  uint8_t pubKey[32];
+  char name[32];
+  uint8_t type;               // ContactType
+  bool favourite;
+  int8_t hops;                // -1: no known path (messages are flooded)
+  uint32_t lastHeard;         // unix time (our clock) of the last advert, 0 = never
+  bool hasPos;
+  int32_t latE6, lonE6;       // position from the contact's advert (degrees * 1e6)
+};
+
+struct MeshEvent {
+  enum Type : uint8_t { NONE = 0, MESSAGE, DELIVERED, FAILED, CONTACT_NEW };
+  Type type = NONE;
+  ConvKey key;
+  char title[32] = {};        // conversation / contact name
+  char text[64] = {};         // message preview
 };
 
 class MeshService {
 public:
   virtual ~MeshService() {}
   virtual const char* selfName() = 0;
-  virtual int unreadCount() = 0;
-  // Fills `out` with up to `max` items, newest first. Returns the count written.
-  virtual int recentMessages(MessagePreview* out, int max) = 0;
+
+  // Conversations and history (read by the screens, written by the mesh).
+  virtual MessageStore& messages() = 0;
+  int unreadCount() { return messages().unreadTotal(); }
+  // Stores the message and sends it (direct with ACK + retries, or to a channel).
+  virtual bool sendText(const ConvKey& to, const char* text) = 0;
+  // Max text length in bytes for this conversation (channels: name prefix included).
+  virtual int maxTextLen(const ConvKey& to) = 0;
+
+  // Contacts: favourites first, then most recently heard.
+  virtual int contactCount() = 0;
+  virtual bool contactAt(int i, ContactView& out) = 0;
+  virtual bool findContact(const ConvKey& key, ContactView& out) = 0;
+  virtual bool setFavourite(const ConvKey& key, bool fav) = 0;
+  virtual bool removeContact(const ConvKey& key) = 0;
+  virtual bool resetPath(const ConvKey& key) = 0;
+
+  virtual bool sendAdvert(bool flood) = 0;
+  // Joins a hashtag channel ("#name", key derived from the name, like the MeshCore app).
+  virtual bool joinChannel(const char* name) = 0;
+  virtual bool leaveChannel(const ConvKey& key) = 0;
+
+  // Events for notifications (new message, delivery...). Returns false when empty.
+  virtual bool pollEvent(MeshEvent& out) = 0;
+
   virtual int neighbours(NeighbourInfo* out, int max) = 0;
   virtual RadioStats radioStats() = 0;
 };
+
+enum SoundKind : uint8_t { SOUND_DIRECT_MSG, SOUND_CHANNEL_MSG, SOUND_SENT, SOUND_FAIL };
 
 class SystemService {
 public:
@@ -63,6 +104,8 @@ public:
   virtual uint16_t batteryMilliVolts() = 0;
   virtual const char* firmwareVersion() = 0;
   virtual void beep(uint16_t freqHz, uint16_t durationMs) = 0;
+  // Short notification jingles (respect the "Son" setting).
+  virtual void playSound(SoundKind kind) = 0;
 };
 
 // User settings edited on the device. Persisted by the platform (LittleFS on the Cardputer).

@@ -88,10 +88,15 @@ DeviceStatus DeviceSystem::status() {
   st.charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
   st.gpsFix = gps.isValid();
   st.gpsSatellites = gps.satellitesCount();
+  if (st.gpsFix) {
+    st.hasPosition = true;
+    st.lat = gps.getLatitude() / 1e6;
+    st.lon = gps.getLongitude() / 1e6;
+  }
   st.bleEnabled = _settings.get().ble;
   st.bleConnected = false;
   uint32_t t = rtc_clock.getCurrentTime();
-  st.unixTime = t > 1700000000u ? t : 0;   // ignore the clock until it has been set (GPS / app)
+  st.unixTime = t;   // the UI shows --:-- until the clock is valid (GPS, contacts' adverts)
   return st;
 }
 
@@ -104,22 +109,23 @@ void DeviceSystem::beep(uint16_t freqHz, uint16_t durationMs) {
   M5.Speaker.tone(freqHz, durationMs);
 }
 
-// ------------------------------------------------------------------ DeviceMeshStub
-
-RadioStats DeviceMeshStub::radioStats() {
-  const UiSettings& s = _settings.get();
-  const RadioPreset& p = presetOf(s);
-  RadioStats r;
-  r.freqMHz = p.freqMHz;
-  r.bandwidthKHz = p.bwKHz;
-  r.spreadingFactor = p.sf;
-  r.txPowerDbm = s.txPowerDbm;
-  if (_radioReady) {
-    r.rxPackets = radio_driver.getPacketsRecv();
-    r.txPackets = radio_driver.getPacketsSent();
-    r.rxErrors = radio_driver.getPacketsRecvErrors();
-    r.lastRssi = radio_driver.getLastRSSI();
-    r.lastSnr = radio_driver.getLastSNR();
+void DeviceSystem::playSound(SoundKind kind) {
+  if (!_settings.get().sound) return;
+  // Queued on one channel (stop_current_sound = false): the notes play one after the other.
+  switch (kind) {
+    case SOUND_DIRECT_MSG:
+      M5.Speaker.tone(2200, 70, 0, true);
+      M5.Speaker.tone(2900, 90, 0, false);
+      break;
+    case SOUND_CHANNEL_MSG:
+      M5.Speaker.tone(2400, 60, 0, true);
+      break;
+    case SOUND_SENT:
+      M5.Speaker.tone(3200, 25, 0, true);
+      break;
+    case SOUND_FAIL:
+      M5.Speaker.tone(700, 120, 0, true);
+      M5.Speaker.tone(450, 180, 0, false);
+      break;
   }
-  return r;
 }

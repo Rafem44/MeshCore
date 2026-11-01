@@ -1,13 +1,16 @@
-// Standalone Cardputer ADV firmware (phase 2): keyboard UI, settings, system screen.
-// Messaging (phase 3), GPS screens (phase 4) and maps (phase 5) plug into the same App.
+// Standalone Cardputer ADV firmware: keyboard messaging UI on top of MeshCore.
+// Phase 3: conversations, chat with delivery tracking, contacts, channels, notifications.
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <M5Unified.h>
+#include <helpers/ArduinoHelpers.h>
 #include <target.h>
 
 #include "../core/App.h"
 #include "../core/screens/HomeScreen.h"
+#include "../core/screens/MessagingScreens.h"
 #include "../core/screens/SettingsScreens.h"
+#include "CardputerMesh.h"
 #include "DeviceServices.h"
 #include "Tca8418Keyboard.h"
 
@@ -17,22 +20,27 @@ static bool radioReady = false;
 
 static DeviceSettings settings;
 static DeviceSystem sys(settings);
-static DeviceMeshStub meshService(settings, radioReady);
-static App app(Services{&meshService, &sys, &settings}, canvas);
+static StdRNG fastRng;
+static SimpleMeshTables tables;
+static CardputerMesh meshNode(radio_driver, fastRng, rtc_clock, tables, settings);
+static App app(Services{&meshNode, &sys, &settings}, canvas);
 
-static PlaceholderScreen messagesScreen("Messages", "Phase 3 : messagerie");
-static PlaceholderScreen contactsScreen("Contacts", "Phase 3 : messagerie");
+static TextInputScreen textInput;
+static ChatScreen chatScreen;
+static ContactDetailScreen contactDetail(chatScreen);
+static ContactsScreen contactsScreen(chatScreen, contactDetail);
+static ConversationsScreen conversations(chatScreen, contactsScreen, textInput);
 static PlaceholderScreen gpsScreen("GPS", "Phase 4 : GPS et boussole");
 static PlaceholderScreen mapScreen("Carte", "Phase 5 : cartes hors ligne");
-static TextInputScreen textInput;
 static SystemScreen systemScreen;
 static SettingsScreen settingsScreen(textInput, systemScreen);
-static HomeScreen home(&messagesScreen, &contactsScreen, &gpsScreen, &mapScreen, &settingsScreen);
+static HomeScreen home(&conversations, &contactsScreen, &gpsScreen, &mapScreen, &settingsScreen);
 
 static uint32_t lastActivity = 0;
 static bool screenAsleep = false;
 static uint32_t lastHeapLog = 0;
-static uint8_t brightness = 96;
+static uint32_t bootAdvertAt = 0;
+static const uint8_t brightness = 96;
 
 static void wakeScreen() {
   if (!screenAsleep) return;
@@ -60,11 +68,18 @@ void setup() {
   board.begin();
 
   if (!LittleFS.begin(true)) Serial.println("[CPADV] ERROR: LittleFS mount failed");
+  Serial.printf("[CPADV] LittleFS %u / %u KB used\n", (unsigned)(LittleFS.usedBytes() / 1024),
+                (unsigned)(LittleFS.totalBytes() / 1024));
   settings.load();
 
   radioReady = radio_init();
   settings.setRadioReady(radioReady);
-  if (radioReady) settings.applyRadio();
+  if (radioReady) {
+    fastRng.begin(radio_driver.getRngSeed());
+    meshNode.begin();
+    settings.applyRadio();
+    bootAdvertAt = millis() + 3000;   // let the radio settle, then announce ourselves
+  }
 
   sensors.begin();
   keyboard.begin();
@@ -78,12 +93,16 @@ void setup() {
   }
 
   app.begin(&home);
+  if (!radioReady) app.notify("Radio absente", "Vérifier le Cap LoRa et l'antenne", 8000);
   lastActivity = millis();
   Serial.printf("[CPADV] ready, free heap %u, min %u, largest block %u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap(),
                 ESP.getMaxAllocHeap());
 }
 
 void loop() {
+  // Radio first: never let the UI delay packet handling
+  meshNode.loop();
+
   KeyEvent e;
   while (keyboard.poll(e)) {
     lastActivity = millis();
@@ -92,11 +111,23 @@ void loop() {
       continue;
     }
     app.handleKey(e);
+    meshNode.loop();
   }
 
   sensors.loop();
 
-  if (!screenAsleep && app.loop()) {
+  if (bootAdvertAt && (int32_t)(millis() - bootAdvertAt) >= 0) {
+    bootAdvertAt = 0;
+    meshNode.sendAdvert(true);
+  }
+
+  if (screenAsleep) {
+    // Screen off: no drawing at all, but events still notify (sound) and wake the screen
+    if (app.pollEvents() && app.bannerVisible()) {
+      lastActivity = millis();
+      wakeScreen();
+    }
+  } else if (app.loop()) {
     canvas.pushSprite(&M5.Display, 0, 0);
   }
 
@@ -105,10 +136,11 @@ void loop() {
 
   if (millis() - lastHeapLog > 60000) {
     lastHeapLog = millis();
-    Serial.printf("[CPADV] heap free %u min %u largest %u, keys %u, radio rx %u tx %u\n", ESP.getFreeHeap(),
-                  ESP.getMinFreeHeap(), ESP.getMaxAllocHeap(), keyboard.eventsRead(),
-                  radioReady ? radio_driver.getPacketsRecv() : 0, radioReady ? radio_driver.getPacketsSent() : 0);
+    RadioStats rs = meshNode.radioStats();
+    Serial.printf("[CPADV] heap free %u min %u largest %u | keys %u | radio rx %u tx %u err %u | contacts %d convs %d\n",
+                  ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap(), keyboard.eventsRead(),
+                  rs.rxPackets, rs.txPackets, rs.rxErrors, meshNode.contactCount(), meshNode.messages().count());
   }
 
-  delay(5);
+  delay(2);
 }

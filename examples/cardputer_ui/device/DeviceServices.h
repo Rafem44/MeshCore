@@ -30,23 +30,8 @@ public:
   uint16_t batteryMilliVolts() override;
   const char* firmwareVersion() override { return CPADV_VERSION; }
   void beep(uint16_t freqHz, uint16_t durationMs) override;
+  void playSound(SoundKind kind) override;
 
 private:
   DeviceSettings& _settings;
-};
-
-// Phase 2: no mesh yet (messaging arrives in phase 3). Reports the node name and the real
-// radio counters so the home and system screens show live data.
-class DeviceMeshStub : public MeshService {
-public:
-  DeviceMeshStub(DeviceSettings& settings, bool& radioReady) : _settings(settings), _radioReady(radioReady) {}
-  const char* selfName() override { return _settings.get().nodeName; }
-  int unreadCount() override { return 0; }
-  int recentMessages(MessagePreview*, int) override { return 0; }
-  int neighbours(NeighbourInfo*, int) override { return 0; }
-  RadioStats radioStats() override;
-
-private:
-  DeviceSettings& _settings;
-  bool& _radioReady;
 };

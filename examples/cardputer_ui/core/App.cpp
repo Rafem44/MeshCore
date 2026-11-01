@@ -1,4 +1,5 @@
 #include "App.h"
+#include "Widgets.h"
 #include <stdio.h>
 
 using namespace theme;
@@ -18,20 +19,62 @@ void App::push(Screen* s) {
 void App::pop() {
   if (_depth <= 1) return;  // never pop the root screen
   _depth--;
-  top()->onEnter(*this);
+  top()->onResume(*this);
   _dirty = true;
 }
 
 void App::handleKey(const KeyEvent& raw) {
   Screen* s = top();
   if (!s) return;
+  if (bannerVisible()) _bannerUntil = 0;   // any key dismisses the notification
   KeyEvent e = s->wantsText() ? raw : toNavigation(raw);
   bool used = s->onKey(*this, e);
   if (!used && e.code == KeyCode::Esc) pop();
   _dirty = true;
 }
 
+void App::notify(const char* title, const char* text, uint32_t ms) {
+  utf8Copy(_bannerTitle, sizeof(_bannerTitle), title ? title : "");
+  utf8Copy(_bannerText, sizeof(_bannerText), text ? text : "");
+  _bannerUntil = now() + ms;
+  if (!_bannerUntil) _bannerUntil = 1;
+  _dirty = true;
+}
+
+bool App::pollEvents() {
+  MeshEvent ev;
+  bool any = false;
+  int guard = 8;   // bounded work per loop
+  while (guard-- && _svc.mesh->pollEvent(ev)) {
+    any = true;
+    _dirty = true;
+    Screen* s = top();
+    if (s && s->onEvent(*this, ev)) continue;
+    switch (ev.type) {
+      case MeshEvent::MESSAGE:
+        notify(ev.title, ev.text);
+        _svc.sys->playSound(ev.key.kind == ConvKey::DIRECT ? SOUND_DIRECT_MSG : SOUND_CHANNEL_MSG);
+        break;
+      case MeshEvent::FAILED: {
+        char t[64];
+        snprintf(t, sizeof(t), "Échec d'envoi : %s", ev.title);
+        notify(t, "Pas d'accusé de réception", 3500);
+        _svc.sys->playSound(SOUND_FAIL);
+        break;
+      }
+      case MeshEvent::CONTACT_NEW:
+        notify("Nouveau contact", ev.title, 2000);
+        break;
+      default:
+        break;
+    }
+  }
+  return any;
+}
+
 bool App::loop() {
+  pollEvents();
+  if (_bannerUntil && !bannerVisible()) { _bannerUntil = 0; _dirty = true; }
   Screen* s = top();
   if (s && s->tick(*this)) _dirty = true;
   // Status bar shows a clock: refresh at least once per second.
@@ -51,9 +94,26 @@ void App::drawAll() {
     s->draw(*this, _g);
     _g.clearClipRect();
   }
+  if (bannerVisible()) drawBanner();
   drawStatusBar();
   drawHelpLine();
   _g.endWrite();
+}
+
+void App::drawBanner() {
+  const int y = CONTENT_Y + 2, h = 2 * LINE_H + 4;
+  _g.fillRoundRect(4, y, SCREEN_W - 8, h, 4, BAR_BG);
+  _g.drawRoundRect(4, y, SCREEN_W - 8, h, 4, ACCENT);
+  char line[96];
+  _g.setTextDatum(lgfx::top_left);
+  _g.setFont(&fontBold);
+  _g.setTextColor(ACCENT);
+  fitText(_g, _bannerTitle, SCREEN_W - 20, line, sizeof(line));
+  _g.drawString(line, 10, y + 2);
+  _g.setFont(&fontText);
+  _g.setTextColor(FG);
+  fitText(_g, _bannerText, SCREEN_W - 20, line, sizeof(line));
+  _g.drawString(line, 10, y + 2 + LINE_H);
 }
 
 void App::drawStatusBar() {
@@ -64,12 +124,7 @@ void App::drawStatusBar() {
 
   // Left: local time (from GPS / phone), or --:--
   char buf[24];
-  if (st.unixTime) {
-    uint32_t t = st.unixTime + _svc.settings->get().utcOffsetMinutes * 60;
-    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)((t / 3600) % 24), (unsigned)((t / 60) % 60));
-  } else {
-    snprintf(buf, sizeof(buf), "--:--");
-  }
+  formatClock(st.unixTime, _svc.settings->get().utcOffsetMinutes, buf, sizeof(buf));
   _g.setTextColor(FG);
   _g.drawString(buf, 2, 1);
 

@@ -1,4 +1,5 @@
 #include "HomeScreen.h"
+#include "../Widgets.h"
 #include <stdio.h>
 
 using namespace theme;
@@ -57,28 +58,31 @@ void HomeScreen::draw(App& app, lgfx::LovyanGFX& g) {
   g.setTextDatum(lgfx::top_left);
   y += LINE_H + 1;
 
-  // Latest messages
+  // Latest conversations (from the in-RAM index: no flash access)
   sectionTitle(g, "Messages", y);
   y += LINE_H;
-  MessagePreview msgs[3];
-  int n = mesh.recentMessages(msgs, 3);
+  MessageStore& store = mesh.messages();
+  uint32_t now = app.services().sys->status().unixTime;
   g.setFont(&fontText);
-  if (n == 0) {
-    g.setTextColor(DIM);
-    g.drawString("Aucun message", MARGIN, y);
-    y += LINE_H;
-  }
-  for (int i = 0; i < n; i++) {
-    uint32_t t = msgs[i].timestamp + utcOffset * 60;
-    snprintf(line, sizeof(line), "%02u:%02u", (unsigned)((t / 3600) % 24), (unsigned)((t / 60) % 60));
+  int shown = 0;
+  for (int i = 0; i < store.count() && shown < 3; i++) {
+    const ConvMeta* c = store.at(i);
+    if (!c || !c->total) continue;
+    formatWhen(c->lastTs, now, utcOffset, line, sizeof(line));
     g.setTextColor(DIM);
     g.drawString(line, MARGIN, y);
     int x = MARGIN + g.textWidth("00:00 ");
-    snprintf(line, sizeof(line), msgs[i].isChannel ? "#%s %s" : "%s: %s", msgs[i].from, msgs[i].text);
+    snprintf(line, sizeof(line), "%s: %s%s", c->name, c->lastOutgoing ? "moi > " : "", c->last);
     fitText(g, line, SCREEN_W - x - MARGIN - 6, fitted, sizeof(fitted));
-    g.setTextColor(msgs[i].unread ? FG : DIM);
+    g.setTextColor(c->unread ? FG : DIM);
     g.drawString(fitted, x, y);
-    if (msgs[i].unread) g.fillCircle(SCREEN_W - MARGIN - 2, y + 6, 2, COLOR_WARN);
+    if (c->unread) g.fillCircle(SCREEN_W - MARGIN - 2, y + 6, 2, COLOR_WARN);
+    y += LINE_H;
+    shown++;
+  }
+  if (shown == 0) {
+    g.setTextColor(DIM);
+    g.drawString("Aucun message", MARGIN, y);
     y += LINE_H;
   }
 
