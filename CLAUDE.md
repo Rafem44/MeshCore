@@ -43,14 +43,20 @@ DIO2 = RF switch, TCXO 3.0 V. Cap 1262 : PI4IOE I2C 0x43, broche 0 à activer.
 GPS UART : ESP TX 13, ESP RX 15. Clavier TCA8418 : SDA 8, SCL 9, INT 11.
 SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 
+## Envs PlatformIO
+- cardputer_adv_companion_ble : firmware companion officiel (appli téléphone), écran companion zoomé.
+- cardputer_adv_standalone : firmware autonome, UI examples/cardputer_ui (core/ + device/).
+- Écran, clavier (I2C interne 8/9), son, batterie via M5Unified/M5GFX ; Wire = port Grove (2/1).
+
 ## Clavier (convention UI)
 Écrans sans saisie : `;` `.` `,` `/` = flèches haut/bas/gauche/droite, `` ` `` = Échap.
 Écrans de saisie : caractères bruts, flèches et Échap via Fn. Voir core/Keys.h (toNavigation).
 
 ## Feuille de route
 0. Socle, CI, simulateur — fait.
-1. Bring-up matériel (variante, radio, PI4IOE, écran, companion BLE) — à valider sur matériel.
-2. Clavier TCA8418 + squelette d'UI (accueil, barre d'état, réglages).
+1. Bring-up matériel (variante, radio, PI4IOE, écran, companion BLE) — compile, à valider sur matériel.
+2. Clavier TCA8418 + squelette d'UI (accueil, barre d'état, réglages) — compile + simulateur OK,
+   à valider sur matériel. Checklist : examples/cardputer_ui/TESTS.md.
 3. Messagerie autonome + persistance LittleFS + son.
 4. GPS et boussole.
 5. Cartes hors ligne (tuiles RGB565 sur SD).
