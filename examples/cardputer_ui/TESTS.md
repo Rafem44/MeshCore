@@ -61,3 +61,24 @@ Il faut un **second nœud MeshCore** (téléphone + appli avec un autre appareil
 - [ ] Éteindre / rallumer : conversations, messages, contacts et canaux toujours là (log `contacts loaded`).
 - [ ] Écran en veille : un message reçu rallume l'écran avec le bandeau.
 - [ ] Laisser tourner 1 h avec du trafic : la ligne `heap free ... min ...` du log reste stable.
+
+## Phase 4 — GPS et boussole (`cardputer_adv_standalone`)
+
+À faire **en extérieur**, ciel dégagé.
+
+- [ ] Au démarrage, le log indique `GPS: NMEA detected at 115200 baud` (ou une autre vitesse).
+      Si `GPS: listening at ...` tourne en boucle sans détection : noter les vitesses essayées et
+      les éventuelles `checksum errors` (câblage / broches RX-TX inversées).
+- [ ] `G` : l'état passe de « recherche... » (orange) à « fix 3D » (vert) en moins de 60 s à froid.
+      Noter le temps exact et le nombre de satellites.
+- [ ] Les coordonnées correspondent à ta position (comparer avec le téléphone), altitude plausible.
+- [ ] En marchant : la vitesse et la direction s'affichent ; à l'arrêt « à l'arrêt ».
+- [ ] L'heure de la barre d'état devient correcte toute seule (log `clock set from GPS`).
+- [ ] `A` sur l'écran GPS : le second nœud reçoit l'annonce avec la position (visible sur sa carte).
+- [ ] Réglages > « Partager position » = oui : les annonces suivantes contiennent la position.
+- [ ] Un contact qui partage sa position : la liste des contacts affiche sa distance ; la distance
+      est cohérente avec celle de l'appli MeshCore.
+- [ ] Fiche contact → `B` : la boussole pointe vers lui. Immobile : « haut = nord » (tenir le Cardputer
+      orienté nord pour vérifier). En marchant : la flèche est relative à la direction de marche.
+- [ ] `,` `/` dans la boussole passent d'un contact à l'autre.
+- [ ] `R` deux fois sur l'écran GPS : redémarrage à froid (log `cold restart sent`), le fix revient.

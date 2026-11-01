@@ -47,6 +47,7 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 - cardputer_adv_companion_ble : firmware companion officiel (appli téléphone), écran companion zoomé.
 - cardputer_adv_standalone : firmware autonome, UI examples/cardputer_ui (core/ + device/).
 - Écran, clavier (I2C interne 8/9), son, batterie via M5Unified/M5GFX ; Wire = port Grove (2/1).
+- Firmware autonome : le GPS (Serial1) est lu par device/DeviceGps, EnvironmentSensorManager n'est pas démarré.
 
 ## Clavier (convention UI)
 Écrans sans saisie : `;` `.` `,` `/` = flèches haut/bas/gauche/droite, `` ` `` = Échap.
@@ -59,7 +60,8 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
    à valider sur matériel. Checklist : examples/cardputer_ui/TESTS.md.
 3. Messagerie autonome + persistance LittleFS + son — compile + simulateur OK, à valider sur matériel.
    core/MessageStore (historique, partagé sim/appareil), device/CardputerMesh (BaseChatMesh, ACK, 3 essais).
-4. GPS et boussole.
+4. GPS et boussole — compile + simulateur OK, à valider sur matériel.
+   core/Nmea (parseur partagé), device/DeviceGps (UART, détection baud, horloge), écrans GPS + boussole.
 5. Cartes hors ligne (tuiles RGB565 sur SD).
 6. Finitions, veille, export/import config, rebase upstream.
 
