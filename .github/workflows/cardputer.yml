@@ -10,6 +10,8 @@ on:
   push:
     branches: [cardputer-adv, 'cardputer-adv-*', 'claude/**']
     tags: ['cardputer-v*']   # a tag publishes a GitHub Release with the firmware files
+  release:
+    types: [published]       # or publish a release from the GitHub site with a new cardputer-v* tag
   pull_request:
     branches: [cardputer-adv]
   workflow_dispatch:
