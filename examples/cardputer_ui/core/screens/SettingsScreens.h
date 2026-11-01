@@ -48,7 +48,7 @@ public:
   bool onKey(App& app, const KeyEvent& e) override;
   void draw(App& app, lgfx::LovyanGFX& g) override;
 
-  enum Item { NAME, RADIO, RADIO_INFO, TX_POWER, TIMEZONE, SCREEN_TIMEOUT, SOUND, BLE, SYSTEM, COUNT };
+  enum Item { NAME, RADIO, RADIO_INFO, TX_POWER, TIMEZONE, SCREEN_TIMEOUT, SOUND, SHARE_LOCATION, BLE, SYSTEM, COUNT };
 
 private:
   void change(App& app, int item, int delta);

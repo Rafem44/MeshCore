@@ -52,6 +52,9 @@ key enter
 expect-setting sound 0
 key .
 key enter
+expect-setting share 1
+key .
+key enter
 expect-setting ble 1
 shot 13_settings_bottom
 

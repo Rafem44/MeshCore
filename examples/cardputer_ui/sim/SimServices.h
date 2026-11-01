@@ -22,19 +22,18 @@ private:
   std::string _dir;
 };
 
+class SimGps;
+
 class SimSystem : public SystemService {
 public:
   uint32_t virtualMillis = 0;
   DeviceStatus st;
   bool soundOn = true;
+  SimGps* gps = nullptr;
 
   SimSystem() { st.batteryPercent = 82; }
   uint32_t millis() override { return virtualMillis; }
-  DeviceStatus status() override {
-    DeviceStatus s = st;
-    if (s.unixTime) s.unixTime += virtualMillis / 1000;
-    return s;
-  }
+  DeviceStatus status() override;
   uint32_t freeHeap() override { return 180 * 1024; }
   uint32_t minFreeHeap() override { return 171 * 1024; }
   uint16_t batteryMilliVolts() override { return 3600 + st.batteryPercent * 6; }
@@ -44,6 +43,25 @@ public:
 
   uint32_t nowUnix() { return st.unixTime ? st.unixTime + virtualMillis / 1000 : 0; }
   int sounds = 0;
+};
+
+// GPS fed with NMEA sentences by the scenario (same parser as on the device).
+class SimGps : public GpsService {
+public:
+  explicit SimGps(SimSystem& sys) : _sys(sys) {}
+  bool feed(const std::string& sentence) { _present = true; _quick = false; return _parser.feedLine(sentence.c_str(), _sys.millis()); }
+  void quick(const std::string& mode, int sats);   // "fix" (at the scenario position), "nofix", "none"
+  const GpsState& state() override { return _quick ? _q : _parser.state(); }
+  bool present() override { return _present; }
+  uint32_t baud() override { return _present ? 115200 : 0; }
+  void coldRestart() override { _parser.reset(); _quick = false; printf("[SIM] GPS cold restart\n"); }
+
+private:
+  SimSystem& _sys;
+  NmeaParser _parser;
+  GpsState _q;
+  bool _quick = false;
+  bool _present = false;
 };
 
 class SimSettings : public SettingsService {
@@ -82,7 +100,9 @@ public:
   bool setFavourite(const ConvKey& key, bool fav) override;
   bool removeContact(const ConvKey& key) override;
   bool resetPath(const ConvKey& key) override;
-  bool sendAdvert(bool flood) override;
+  bool sendAdvert(bool flood, bool withPosition) override;
+  GpsService* gps = nullptr;
+  int advertsWithPosition = 0;
   bool joinChannel(const char* name) override;
   bool leaveChannel(const ConvKey& key) override;
   bool pollEvent(MeshEvent& out) override;

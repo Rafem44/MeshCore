@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "MessageStore.h"
+#include "Nmea.h"
 
 struct DeviceStatus {
   int  batteryPercent = -1;   // -1 = unknown
@@ -80,7 +81,8 @@ public:
   virtual bool removeContact(const ConvKey& key) = 0;
   virtual bool resetPath(const ConvKey& key) = 0;
 
-  virtual bool sendAdvert(bool flood) = 0;
+  // withPosition: include the GPS position (only if there is a fix).
+  virtual bool sendAdvert(bool flood, bool withPosition) = 0;
   // Joins a hashtag channel ("#name", key derived from the name, like the MeshCore app).
   virtual bool joinChannel(const char* name) = 0;
   virtual bool leaveChannel(const ConvKey& key) = 0;
@@ -117,6 +119,7 @@ struct UiSettings {
   uint16_t screenTimeoutSecs = 60;  // 0 = never
   bool sound = true;
   bool ble = false;
+  bool shareLocation = false;       // include the GPS position in adverts
 };
 
 class SettingsService {
@@ -127,8 +130,18 @@ public:
   virtual bool save(const UiSettings& s) = 0;
 };
 
+class GpsService {
+public:
+  virtual ~GpsService() {}
+  virtual const GpsState& state() = 0;
+  virtual bool present() = 0;          // NMEA sentences received (module wired and talking)
+  virtual uint32_t baud() = 0;         // detected baud rate, 0 while searching
+  virtual void coldRestart() = 0;      // forget the almanac / last position
+};
+
 struct Services {
   MeshService* mesh;
   SystemService* sys;
   SettingsService* settings;
+  GpsService* gps;
 };

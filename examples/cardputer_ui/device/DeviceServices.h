@@ -22,7 +22,7 @@ private:
 
 class DeviceSystem : public SystemService {
 public:
-  explicit DeviceSystem(DeviceSettings& settings) : _settings(settings) {}
+  DeviceSystem(DeviceSettings& settings, GpsService& gps) : _settings(settings), _gps(gps) {}
   uint32_t millis() override;
   DeviceStatus status() override;
   uint32_t freeHeap() override;
@@ -34,4 +34,5 @@ public:
 
 private:
   DeviceSettings& _settings;
+  GpsService& _gps;
 };

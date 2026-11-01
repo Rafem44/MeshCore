@@ -303,12 +303,16 @@ bool CardputerMesh::resetPath(const ConvKey& key) {
   return true;
 }
 
-bool CardputerMesh::sendAdvert(bool flood) {
+bool CardputerMesh::sendAdvert(bool flood, bool withPosition) {
   if (!_started) return false;
-  mesh::Packet* pkt = createSelfAdvert(selfName());
+  bool pos = withPosition && _gps && _gps->state().valid;
+  mesh::Packet* pkt = pos ? createSelfAdvert(selfName(), _gps->state().lat, _gps->state().lon)
+                          : createSelfAdvert(selfName());
   if (!pkt) return false;
   if (flood) sendFlood(pkt); else sendZeroHop(pkt);
-  Serial.printf("[CPADV] advert sent (%s) as '%s'\n", flood ? "flood" : "zero hop", selfName());
+  if (pos) Serial.printf("[CPADV] advert sent (%s) as '%s' at %.5f, %.5f\n", flood ? "flood" : "zero hop", selfName(),
+                         _gps->state().lat, _gps->state().lon);
+  else Serial.printf("[CPADV] advert sent (%s) as '%s'\n", flood ? "flood" : "zero hop", selfName());
   return true;
 }
 

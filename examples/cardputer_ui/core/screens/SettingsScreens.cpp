@@ -136,7 +136,7 @@ const uint16_t TIMEOUTS[] = {15, 30, 60, 120, 300, 0};
 constexpr int TIMEOUT_COUNT = sizeof(TIMEOUTS) / sizeof(TIMEOUTS[0]);
 const char* const LABELS[SettingsScreen::COUNT] = {
   "Nom", "Réglage radio", "  Détail", "Puissance émission", "Fuseau horaire",
-  "Veille écran", "Son", "Bluetooth (appli)", "Système",
+  "Veille écran", "Son", "Partager position", "Bluetooth (appli)", "Système",
 };
 }  // namespace
 
@@ -178,6 +178,7 @@ void SettingsScreen::change(App& app, int item, int delta) {
       break;
     }
     case SOUND: s.sound = !s.sound; break;
+    case SHARE_LOCATION: s.shareLocation = !s.shareLocation; break;
     case BLE: s.ble = !s.ble; break;
     default: return;
   }
@@ -231,6 +232,7 @@ void SettingsScreen::formatValue(App& app, int item, char* out, size_t n) {
       else snprintf(out, n, "< %u min >", s.screenTimeoutSecs / 60);
       break;
     case SOUND: snprintf(out, n, "%s", s.sound ? "oui" : "non"); break;
+    case SHARE_LOCATION: snprintf(out, n, "%s", s.shareLocation ? "oui" : "non"); break;
     case BLE: snprintf(out, n, "%s", s.ble ? "oui" : "non"); break;
     case SYSTEM: snprintf(out, n, ">"); break;
   }

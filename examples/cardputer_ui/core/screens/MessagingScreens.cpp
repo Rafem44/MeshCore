@@ -1,4 +1,5 @@
 #include "MessagingScreens.h"
+#include "GpsScreens.h"
 #include "../Geo.h"
 #include <stdio.h>
 #include <string.h>
@@ -338,7 +339,7 @@ bool ContactsScreen::onKey(App& app, const KeyEvent& e) {
     return true;
   }
   if (e.is('a')) {
-    bool ok = mesh.sendAdvert(true);
+    bool ok = mesh.sendAdvert(true, app.services().settings->get().shareLocation);
     app.notify(ok ? "Annonce envoyée" : "Annonce impossible", ok ? "Les autres nœuds vont te voir" : "Radio indisponible",
                2000);
     return true;
@@ -380,14 +381,21 @@ void ContactsScreen::draw(App& app, lgfx::LovyanGFX& g) {
     return;
   }
   syncSelection(mesh);
-  uint32_t now = nowUnix(app);
+  DeviceStatus st = app.services().sys->status();
+  uint32_t now = st.unixTime;
   for (int i = 0; i < LIST_VISIBLE_ROWS && _list.top + i < n; i++) {
     int k = _list.top + i;
     ContactView c;
     if (!mesh.contactAt(k, c)) break;
     int y = CONTENT_Y + 1 + i * LINE_H;
     char right[32], hops[16], ago[12], name[48];
-    hopsLabel(c.hops, hops, sizeof(hops));
+    if (c.hasPos && st.hasPosition) {
+      double d = geo::distanceM(st.lat, st.lon, c.latE6 / 1e6, c.lonE6 / 1e6);
+      if (d < 1000) snprintf(hops, sizeof(hops), "%.0f m", d);
+      else snprintf(hops, sizeof(hops), "%.1f km", d / 1000);
+    } else {
+      hopsLabel(c.hops, hops, sizeof(hops));
+    }
     if (c.lastHeard && clockValid(now) && now >= c.lastHeard) {
       formatAgo(now - c.lastHeard, ago, sizeof(ago));
       snprintf(right, sizeof(right), "%s  %s", hops, ago);
@@ -413,6 +421,15 @@ bool ContactDetailScreen::onKey(App& app, const KeyEvent& e) {
   }
   if (e.is('f')) {
     mesh.setFavourite(c.key, !c.favourite);
+    return true;
+  }
+  if (e.is('b') && _compass) {
+    if (!c.hasPos) {
+      app.notify(c.name, "Position inconnue (il ne la partage pas)", 2500);
+      return true;
+    }
+    _compass->setTarget(c.key);
+    app.push(_compass);
     return true;
   }
   if (e.is('x')) {

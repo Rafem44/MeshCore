@@ -31,6 +31,39 @@ bool SimStorage::remove(const char* path) { return ::remove(full(path).c_str()) 
 
 // ------------------------------------------------------------------ SimSystem / SimSettings
 
+DeviceStatus SimSystem::status() {
+  DeviceStatus s = st;
+  if (s.unixTime) s.unixTime += virtualMillis / 1000;
+  if (gps) {
+    const GpsState& g = gps->state();
+    s.gpsFix = g.valid;
+    s.gpsSatellites = g.sats;
+    if (g.valid) { s.hasPosition = true; s.lat = g.lat; s.lon = g.lon; }
+  }
+  return s;
+}
+
+void SimGps::quick(const std::string& mode, int sats) {
+  _quick = true;
+  _q = GpsState();
+  _present = mode != "none";
+  if (mode == "fix") {
+    DeviceStatus st = _sys.st;   // position from the "pos" command, if any
+    _q.valid = true;
+    _q.sats = sats;
+    _q.hdop = 0.9f;
+    _q.fixType = 3;
+    _q.lat = st.hasPosition ? st.lat : 43.6116;
+    _q.lon = st.hasPosition ? st.lon : 1.3346;
+    _q.altM = 162;
+    _q.fixMillis = _sys.millis();
+    _q.sentences = 10;
+  } else if (mode == "nofix") {
+    _q.sats = sats;
+    _q.sentences = 10;
+  }
+}
+
 void SimSystem::beep(uint16_t freqHz, uint16_t durationMs) {
   printf("[SIM] beep %u Hz %u ms\n", freqHz, durationMs);
 }
@@ -283,9 +316,12 @@ bool SimMesh::resetPath(const ConvKey& key) {
   return true;
 }
 
-bool SimMesh::sendAdvert(bool flood) {
+bool SimMesh::sendAdvert(bool flood, bool withPosition) {
   sentPackets++;
-  printf("[SIM] advert (%s)\n", flood ? "flood" : "zero hop");
+  bool pos = withPosition && gps && gps->state().valid;
+  if (pos) advertsWithPosition++;
+  if (pos) printf("[SIM] advert (%s) with position %.5f, %.5f\n", flood ? "flood" : "zero hop", gps->state().lat, gps->state().lon);
+  else printf("[SIM] advert (%s)\n", flood ? "flood" : "zero hop");
   return true;
 }
 

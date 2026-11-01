@@ -1,11 +1,11 @@
 #include "DeviceServices.h"
 #include "../core/RadioPresets.h"
 #include <Arduino.h>
+#include <stddef.h>
 #include <LittleFS.h>
 #include <M5Unified.h>
 #include <target.h>
 
-extern MicroNMEALocationProvider gps;   // defined in variants/m5stack_cardputer_adv/target.cpp
 
 namespace {
 constexpr const char* SETTINGS_PATH = "/cpadv_settings.bin";
@@ -32,6 +32,10 @@ const RadioPreset& presetOf(const UiSettings& s) {
 }  // namespace
 
 // ------------------------------------------------------------------ DeviceSettings
+// File layout: magic(4) version(2) size(2) payload(size) [pad to 4] checksum(4).
+// When UiSettings grows, older files still load: the new fields keep their defaults.
+
+static uint32_t align4(uint32_t v) { return (v + 3) & ~3u; }
 
 void DeviceSettings::load() {
   File f = LittleFS.open(SETTINGS_PATH, "r");
@@ -39,17 +43,30 @@ void DeviceSettings::load() {
     Serial.println("[CPADV] settings: no file, using defaults");
     return;
   }
-  SettingsFile sf;
-  size_t n = f.read((uint8_t*)&sf, sizeof(sf));
+  uint8_t buf[sizeof(SettingsFile) + 64] = {};
+  size_t n = f.read(buf, sizeof(buf));
   f.close();
-  if (n != sizeof(sf) || sf.magic != SETTINGS_MAGIC || sf.version != SETTINGS_VERSION ||
-      sf.size != sizeof(UiSettings) || sf.checksum != checksum((const uint8_t*)&sf.s, sizeof(sf.s))) {
-    Serial.println("[CPADV] settings: file invalid or from another version, using defaults");
+  uint32_t magic;
+  uint16_t version, size;
+  memcpy(&magic, buf, 4);
+  memcpy(&version, buf + 4, 2);
+  memcpy(&size, buf + 6, 2);
+  uint32_t csOff = align4(8 + size), cs = 0;
+  if (n < csOff + 4 || magic != SETTINGS_MAGIC || version != SETTINGS_VERSION || size > sizeof(UiSettings)) {
+    Serial.println("[CPADV] settings: file invalid, using defaults");
     return;
   }
-  _s = sf.s;
+  memcpy(&cs, buf + csOff, 4);
+  if (cs != checksum(buf + 8, size)) {
+    Serial.println("[CPADV] settings: checksum mismatch, using defaults");
+    return;
+  }
+  UiSettings s;                  // defaults for fields the file does not have yet
+  memcpy(&s, buf + 8, size);
+  _s = s;
   _s.nodeName[sizeof(_s.nodeName) - 1] = 0;
-  Serial.printf("[CPADV] settings loaded: name='%s' preset=%u tx=%d\n", _s.nodeName, _s.radioPreset, _s.txPowerDbm);
+  Serial.printf("[CPADV] settings loaded (%u/%u bytes): name='%s' preset=%u tx=%d share=%d\n", size,
+                (unsigned)sizeof(UiSettings), _s.nodeName, _s.radioPreset, _s.txPowerDbm, _s.shareLocation);
 }
 
 bool DeviceSettings::save(const UiSettings& s) {
@@ -61,6 +78,7 @@ bool DeviceSettings::save(const UiSettings& s) {
   sf.size = sizeof(UiSettings);
   sf.s = _s;
   sf.checksum = checksum((const uint8_t*)&sf.s, sizeof(sf.s));
+  static_assert(offsetof(SettingsFile, s) == 8, "settings payload must start at offset 8");
   File f = LittleFS.open(SETTINGS_PATH, "w");
   bool ok = f && f.write((const uint8_t*)&sf, sizeof(sf)) == sizeof(sf);
   if (f) f.close();
@@ -86,12 +104,13 @@ DeviceStatus DeviceSystem::status() {
   DeviceStatus st;
   st.batteryPercent = M5.Power.getBatteryLevel();
   st.charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
-  st.gpsFix = gps.isValid();
-  st.gpsSatellites = gps.satellitesCount();
-  if (st.gpsFix) {
+  const GpsState& g = _gps.state();
+  st.gpsFix = g.valid;
+  st.gpsSatellites = g.sats;
+  if (g.valid) {
     st.hasPosition = true;
-    st.lat = gps.getLatitude() / 1e6;
-    st.lon = gps.getLongitude() / 1e6;
+    st.lat = g.lat;
+    st.lon = g.lon;
   }
   st.bleEnabled = _settings.get().ble;
   st.bleConnected = false;

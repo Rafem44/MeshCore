@@ -18,6 +18,7 @@ public:
   void begin();   // identity, contacts, channels, message index (LittleFS must be mounted)
   void loop();    // mesh + retries + deferred saves; call as often as possible
   bool started() const { return _started; }
+  void setGps(GpsService* gps) { _gps = gps; }
 
   // ---- MeshService ----
   const char* selfName() override { return _settings.get().nodeName; }
@@ -30,7 +31,7 @@ public:
   bool setFavourite(const ConvKey& key, bool fav) override;
   bool removeContact(const ConvKey& key) override;
   bool resetPath(const ConvKey& key) override;
-  bool sendAdvert(bool flood) override;
+  bool sendAdvert(bool flood, bool withPosition) override;
   bool joinChannel(const char* name) override;
   bool leaveChannel(const ConvKey& key) override;
   bool pollEvent(MeshEvent& out) override;
@@ -98,6 +99,7 @@ private:
   void rebuildContactOrder();
 
   DeviceSettings& _settings;
+  GpsService* _gps = nullptr;
   LittleFsStorage _storage;
   MessageStore _store;
   bool _started = false;

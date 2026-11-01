@@ -85,19 +85,23 @@ private:
   char _title[32] = "Contacts";
 };
 
+class CompassScreen;
+
 class ContactDetailScreen : public Screen {
 public:
   explicit ContactDetailScreen(ChatScreen& chat) : _chat(chat) {}
   void show(const ConvKey& key) { _key = key; }
+  void setCompass(CompassScreen* compass) { _compass = compass; }
 
   const char* title() const override { return "Contact"; }
-  const char* help() const override { return "M écrire  F favori  X réinit. chemin"; }
+  const char* help() const override { return "M:écrire F:favori X:chemin B:boussole"; }
   bool onKey(App& app, const KeyEvent& e) override;
   bool tick(App& app) override;
   void draw(App& app, lgfx::LovyanGFX& g) override;
 
 private:
   ChatScreen& _chat;
+  CompassScreen* _compass = nullptr;
   ConvKey _key;
   uint32_t _lastRefresh = 0;
 };

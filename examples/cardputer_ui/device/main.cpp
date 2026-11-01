@@ -1,5 +1,6 @@
 // Standalone Cardputer ADV firmware: keyboard messaging UI on top of MeshCore.
 // Phase 3: conversations, chat with delivery tracking, contacts, channels, notifications.
+// Phase 4: GPS (NMEA, clock sync), advert with position, compass towards contacts.
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <M5Unified.h>
@@ -10,7 +11,9 @@
 #include "../core/screens/HomeScreen.h"
 #include "../core/screens/MessagingScreens.h"
 #include "../core/screens/SettingsScreens.h"
+#include "../core/screens/GpsScreens.h"
 #include "CardputerMesh.h"
+#include "DeviceGps.h"
 #include "DeviceServices.h"
 #include "Tca8418Keyboard.h"
 
@@ -19,18 +22,20 @@ static Tca8418Keyboard keyboard;
 static bool radioReady = false;
 
 static DeviceSettings settings;
-static DeviceSystem sys(settings);
+static DeviceGps gpsDev;
+static DeviceSystem sys(settings, gpsDev);
 static StdRNG fastRng;
 static SimpleMeshTables tables;
 static CardputerMesh meshNode(radio_driver, fastRng, rtc_clock, tables, settings);
-static App app(Services{&meshNode, &sys, &settings}, canvas);
+static App app(Services{&meshNode, &sys, &settings, &gpsDev}, canvas);
 
 static TextInputScreen textInput;
 static ChatScreen chatScreen;
 static ContactDetailScreen contactDetail(chatScreen);
 static ContactsScreen contactsScreen(chatScreen, contactDetail);
 static ConversationsScreen conversations(chatScreen, contactsScreen, textInput);
-static PlaceholderScreen gpsScreen("GPS", "Phase 4 : GPS et boussole");
+static CompassScreen compassScreen;
+static GpsScreen gpsScreen(compassScreen);
 static PlaceholderScreen mapScreen("Carte", "Phase 5 : cartes hors ligne");
 static SystemScreen systemScreen;
 static SettingsScreen settingsScreen(textInput, systemScreen);
@@ -81,7 +86,10 @@ void setup() {
     bootAdvertAt = millis() + 3000;   // let the radio settle, then announce ourselves
   }
 
-  sensors.begin();
+  gpsDev.begin();   // the GPS UART is ours: EnvironmentSensorManager is not started
+  meshNode.setGps(&gpsDev);
+  compassScreen.setChat(&chatScreen);
+  contactDetail.setCompass(&compassScreen);
   keyboard.begin();
 
   M5.Display.setRotation(1);
@@ -114,11 +122,11 @@ void loop() {
     meshNode.loop();
   }
 
-  sensors.loop();
+  gpsDev.loop();
 
   if (bootAdvertAt && (int32_t)(millis() - bootAdvertAt) >= 0) {
     bootAdvertAt = 0;
-    meshNode.sendAdvert(true);
+    meshNode.sendAdvert(true, settings.get().shareLocation);
   }
 
   if (screenAsleep) {

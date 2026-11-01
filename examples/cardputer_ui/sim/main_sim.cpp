@@ -23,13 +23,18 @@
 //                                  row 0..3 / col 0..13 of the physical keyboard; default = press+release
 //   name <self name>               set this node's name (without going through the settings screen)
 //   battery <pct> [charging]
-//   gps fix <sats> | gps nofix
+//   gps fix <sats> | gps nofix | gps none   quick GPS states (none = module silent)
+//   nmea <sentence>                feed one NMEA sentence to the GPS parser ("$GPGGA,...*hh")
+//   nmeafile <path> [ms]           replay a recorded NMEA file, one sentence group per [ms] (default 1000)
+//   expect-gps <field> <value>     fix 0/1 | sats | lat | lon (6 decimals) | speed (km/h, 1 decimal)
+//   nmea-bad <sentence>            the sentence must be rejected (bad checksum / malformed)
+//   expect-adverts-pos <n>         number of adverts sent with the GPS position
 //   ble on|off|connected
 //   time <unix>                    set the wall clock (UTC)
 //   shot <name>                    write <output_dir>/<name>.png
 //   expect-screen <title>          fail (exit 1) if the current screen title differs
 //   expect-unread <n>              fail if the unread counter differs
-//   expect-setting <field> <value> name|preset|tx|tz|timeout|sound|ble (tz in minutes, bools 0/1)
+//   expect-setting <field> <value> name|preset|tx|tz|timeout|sound|share|ble (tz in minutes, bools 0/1)
 //   expect-convs <n>               number of conversations
 //   expect-msgs <conv> <n>         number of stored messages in a conversation (by name)
 //   expect-last <conv> <state> [text...]  state of the newest message: received|pending|sent|delivered|failed|channel
@@ -39,6 +44,7 @@
 #include "../core/screens/HomeScreen.h"
 #include "../core/screens/SettingsScreens.h"
 #include "../core/screens/MessagingScreens.h"
+#include "../core/screens/GpsScreens.h"
 #include "../core/KeyMatrix.h"
 #include "SimServices.h"
 #include "PngWriter.h"
@@ -139,8 +145,11 @@ int main(int argc, char** argv) {
   SimSystem sys;
   SimSettings settings;
   strcpy(settings.s.nodeName, "Cardputer-Sim");
+  SimGps gpsSvc(sys);
+  sys.gps = &gpsSvc;
   SimMesh mesh(sys, settings, storage);
-  Services svc{&mesh, &sys, &settings};
+  mesh.gps = &gpsSvc;
+  Services svc{&mesh, &sys, &settings, &gpsSvc};
   App app(svc, g_canvas);
   KeyMatrix matrix;
 
@@ -149,7 +158,10 @@ int main(int argc, char** argv) {
   ContactDetailScreen contactDetail(chat);
   ContactsScreen contacts(chat, contactDetail);
   ConversationsScreen conversations(chat, contacts, textInput);
-  PlaceholderScreen gps("GPS", "Phase 4 : GPS et boussole");
+  CompassScreen compass;
+  compass.setChat(&chat);
+  contactDetail.setCompass(&compass);
+  GpsScreen gps(compass);
   PlaceholderScreen map("Carte", "Phase 5 : cartes hors ligne");
   SystemScreen systemScreen;
   SettingsScreen settingsScreen(textInput, systemScreen);
@@ -248,9 +260,45 @@ int main(int argc, char** argv) {
       std::string c; ls >> sys.st.batteryPercent >> c; sys.st.charging = (c == "charging"); app.invalidate(); runFor(LOOP_MS);
     } else if (cmd == "gps") {
       std::string m; ls >> m;
-      sys.st.gpsFix = (m == "fix");
-      if (sys.st.gpsFix) ls >> sys.st.gpsSatellites; else sys.st.gpsSatellites = 0;
+      int sats = 0;
+      if (m == "fix") ls >> sats;
+      gpsSvc.quick(m, sats);
       app.invalidate(); runFor(LOOP_MS);
+    } else if (cmd == "nmea") {
+      std::string s = rest(ls);
+      if (!gpsSvc.feed(s)) { fprintf(stderr, "line %d: NMEA sentence rejected: %s\n", lineNo, s.c_str()); g_failures++; }
+      runFor(LOOP_MS);
+    } else if (cmd == "nmeafile") {
+      std::string path; uint32_t ms = 1000; ls >> path >> ms;
+      if (!ms) ms = 1000;
+      std::ifstream nf(path);
+      if (!nf) { fprintf(stderr, "line %d: cannot open %s\n", lineNo, path.c_str()); g_failures++; continue; }
+      std::string s; int count = 0;
+      while (std::getline(nf, s)) {
+        if (s.empty()) continue;
+        gpsSvc.feed(s);
+        // a new second starts with RMC: advance the clock between groups
+        if (s.compare(3, 3, "RMC") == 0) runFor(ms);
+        count++;
+      }
+      printf("[SIM] replayed %d NMEA sentences from %s\n", count, path.c_str());
+    } else if (cmd == "nmea-bad") {
+      std::string s = rest(ls);
+      if (gpsSvc.feed(s)) { fprintf(stderr, "line %d: FAIL NMEA sentence accepted: %s\n", lineNo, s.c_str()); g_failures++; }
+    } else if (cmd == "expect-adverts-pos") {
+      int want = 0; ls >> want;
+      if (want != mesh.advertsWithPosition) { fprintf(stderr, "line %d: FAIL expected %d adverts with position, got %d\n", lineNo, want, mesh.advertsWithPosition); g_failures++; }
+    } else if (cmd == "expect-gps") {
+      std::string field, want; ls >> field >> want;
+      const GpsState& g = gpsSvc.state();
+      char got[32];
+      if (field == "fix") snprintf(got, sizeof(got), "%d", g.valid ? 1 : 0);
+      else if (field == "sats") snprintf(got, sizeof(got), "%u", g.sats);
+      else if (field == "lat") snprintf(got, sizeof(got), "%.6f", g.lat);
+      else if (field == "lon") snprintf(got, sizeof(got), "%.6f", g.lon);
+      else if (field == "speed") snprintf(got, sizeof(got), "%.1f", g.speedKmh);
+      else snprintf(got, sizeof(got), "<unknown>");
+      if (want != got) { fprintf(stderr, "line %d: FAIL gps %s expected %s, got %s\n", lineNo, field.c_str(), want.c_str(), got); g_failures++; }
     } else if (cmd == "ble") {
       std::string m; ls >> m;
       sys.st.bleEnabled = (m != "off"); sys.st.bleConnected = (m == "connected");
@@ -282,6 +330,7 @@ int main(int argc, char** argv) {
       else if (field == "timeout") got = std::to_string(s.screenTimeoutSecs);
       else if (field == "sound") got = std::to_string(s.sound);
       else if (field == "ble") got = std::to_string(s.ble);
+      else if (field == "share") got = std::to_string(s.shareLocation);
       else got = "<unknown field>";
       if (want != got) { fprintf(stderr, "line %d: FAIL setting %s expected '%s', got '%s'\n", lineNo, field.c_str(), want.c_str(), got.c_str()); g_failures++; }
     } else if (cmd == "expect-convs") {
