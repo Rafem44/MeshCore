@@ -27,9 +27,9 @@ constexpr uint16_t BG        = 0x0000;
 constexpr uint16_t FG        = 0xFFFF;
 constexpr uint16_t DIM       = 0x8410;  // grey
 constexpr uint16_t ACCENT    = 0x05FF;  // cyan-ish
-constexpr uint16_t OK        = 0x07E0;  // green
-constexpr uint16_t WARN      = 0xFD20;  // orange
-constexpr uint16_t BAD       = 0xF800;  // red
+constexpr uint16_t COLOR_OK        = 0x07E0;  // green
+constexpr uint16_t COLOR_WARN      = 0xFD20;  // orange
+constexpr uint16_t COLOR_BAD       = 0xF800;  // red
 constexpr uint16_t BAR_BG    = 0x10A2;  // dark blue-grey
 constexpr uint16_t SELECT_BG = 0x2967;
 

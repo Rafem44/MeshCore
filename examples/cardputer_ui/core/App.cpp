@@ -85,7 +85,7 @@ void App::drawStatusBar() {
 
   if (st.batteryPercent >= 0) snprintf(buf, sizeof(buf), "%d%%%s", st.batteryPercent, st.charging ? "+" : "");
   else snprintf(buf, sizeof(buf), "?%%");
-  _g.setTextColor(st.batteryPercent >= 0 && st.batteryPercent < 15 ? BAD : FG);
+  _g.setTextColor(st.batteryPercent >= 0 && st.batteryPercent < 15 ? COLOR_BAD : FG);
   _g.drawString(buf, x, 1);
   x -= _g.textWidth(buf) + 6;
 
@@ -97,14 +97,14 @@ void App::drawStatusBar() {
 
   if (st.gpsFix) snprintf(buf, sizeof(buf), "GPS%d", st.gpsSatellites);
   else snprintf(buf, sizeof(buf), "GPS-");
-  _g.setTextColor(st.gpsFix ? OK : DIM);
+  _g.setTextColor(st.gpsFix ? COLOR_OK : DIM);
   _g.drawString(buf, x, 1);
   x -= _g.textWidth(buf) + 6;
 
   int unread = _svc.mesh->unreadCount();
   if (unread > 0) {
     snprintf(buf, sizeof(buf), "*%d", unread);
-    _g.setTextColor(WARN);
+    _g.setTextColor(COLOR_WARN);
     _g.drawString(buf, x, 1);
   }
   _g.setTextDatum(lgfx::top_left);

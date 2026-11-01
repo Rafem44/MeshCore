@@ -78,7 +78,7 @@ void HomeScreen::draw(App& app, lgfx::LovyanGFX& g) {
     fitText(g, line, SCREEN_W - x - MARGIN - 6, fitted, sizeof(fitted));
     g.setTextColor(msgs[i].unread ? FG : DIM);
     g.drawString(fitted, x, y);
-    if (msgs[i].unread) g.fillCircle(SCREEN_W - MARGIN - 2, y + 6, 2, WARN);
+    if (msgs[i].unread) g.fillCircle(SCREEN_W - MARGIN - 2, y + 6, 2, COLOR_WARN);
     y += LINE_H;
   }
 
