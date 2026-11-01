@@ -18,6 +18,7 @@ public:
   void begin();   // identity, contacts, channels, message index (LittleFS must be mounted)
   void loop();    // mesh + retries + deferred saves; call as often as possible
   bool started() const { return _started; }
+  void flush() { if (_started) { saveContacts(); _store.flush(); } }   // before a backup
   void setGps(GpsService* gps) { _gps = gps; }
 
   // ---- MeshService ----

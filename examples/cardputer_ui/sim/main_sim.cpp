@@ -27,6 +27,8 @@
 //   nmea <sentence>                feed one NMEA sentence to the GPS parser ("$GPGGA,...*hh")
 //   nmeafile <path> [ms]           replay a recorded NMEA file, one sentence group per [ms] (default 1000)
 //   expect-gps <field> <value>     fix 0/1 | sats | lat | lon (6 decimals) | speed (km/h, 1 decimal)
+//   demo                           demo firmware mode: talking characters (bot) + fake walking GPS
+//   sd on|off                      SD card present (backup / restore)
 //   tiles <dir>                    use the map tiles of <dir>/tiles (made by tools/tiles/make_tiles.py)
 //   expect-tiles-read <n>          number of tile files opened so far (render cost / caching checks)
 //   nmea-bad <sentence>            the sentence must be rejected (bad checksum / malformed)
@@ -36,7 +38,7 @@
 //   shot <name>                    write <output_dir>/<name>.png
 //   expect-screen <title>          fail (exit 1) if the current screen title differs
 //   expect-unread <n>              fail if the unread counter differs
-//   expect-setting <field> <value> name|preset|tx|tz|timeout|sound|share|ble (tz in minutes, bools 0/1)
+//   expect-setting <field> <value> name|preset|tx|tz|timeout|brightness|sound|share (tz in minutes, bools 0/1)
 //   expect-convs <n>               number of conversations
 //   expect-msgs <conv> <n>         number of stored messages in a conversation (by name)
 //   expect-last <conv> <state> [text...]  state of the newest message: received|pending|sent|delivered|failed|channel
@@ -48,6 +50,7 @@
 #include "../core/screens/MessagingScreens.h"
 #include "../core/screens/GpsScreens.h"
 #include "../core/screens/MapScreen.h"
+#include "../core/DemoGps.h"
 #include "../core/KeyMatrix.h"
 #include "SimServices.h"
 #include "PngWriter.h"
@@ -151,9 +154,13 @@ int main(int argc, char** argv) {
   SimGps gpsSvc(sys);
   sys.gps = &gpsSvc;
   SimMesh mesh(sys, settings, storage);
+  mesh.begin();
   mesh.gps = &gpsSvc;
   SimTiles tiles;
-  Services svc{&mesh, &sys, &settings, &gpsSvc, &tiles};
+  SimBackup backup(settings);
+  DemoGps demoGps(sys);
+  bool demo = false;
+  Services svc{&mesh, &sys, &settings, &gpsSvc, &tiles, &backup};
   App app(svc, g_canvas);
   KeyMatrix matrix;
 
@@ -175,6 +182,7 @@ int main(int argc, char** argv) {
   auto runFor = [&](uint32_t ms) {
     uint32_t end = sys.virtualMillis + ms;
     do {
+      if (demo) demoGps.tick();
       mesh.tick();
       if (app.loop()) g_frames++;
       if (sys.virtualMillis >= end) break;
@@ -286,6 +294,17 @@ int main(int argc, char** argv) {
         count++;
       }
       printf("[SIM] replayed %d NMEA sentences from %s\n", count, path.c_str());
+    } else if (cmd == "demo") {
+      demo = true;
+      demoGps.baseUnix = sys.nowUnix() ? sys.nowUnix() : demoGps.baseUnix;
+      sys.gps = &demoGps;
+      mesh.gps = &demoGps;
+      app.services().gps = &demoGps;
+      mesh.enableBot(42);
+      mesh.seedDemo();
+      runFor(LOOP_MS);
+    } else if (cmd == "sd") {
+      std::string v; ls >> v; backup.card = (v == "on"); app.invalidate(); runFor(LOOP_MS);
     } else if (cmd == "tiles") {
       std::string d; ls >> d;
       if (!tiles.open(d)) { fprintf(stderr, "line %d: no tiles in %s\n", lineNo, d.c_str()); g_failures++; }
@@ -300,7 +319,7 @@ int main(int argc, char** argv) {
       if (want != mesh.advertsWithPosition) { fprintf(stderr, "line %d: FAIL expected %d adverts with position, got %d\n", lineNo, want, mesh.advertsWithPosition); g_failures++; }
     } else if (cmd == "expect-gps") {
       std::string field, want; ls >> field >> want;
-      const GpsState& g = gpsSvc.state();
+      const GpsState& g = app.services().gps->state();
       char got[32];
       if (field == "fix") snprintf(got, sizeof(got), "%d", g.valid ? 1 : 0);
       else if (field == "sats") snprintf(got, sizeof(got), "%u", g.sats);
@@ -341,6 +360,7 @@ int main(int argc, char** argv) {
       else if (field == "sound") got = std::to_string(s.sound);
       else if (field == "ble") got = std::to_string(s.ble);
       else if (field == "share") got = std::to_string(s.shareLocation);
+      else if (field == "brightness") got = std::to_string(s.brightness);
       else got = "<unknown field>";
       if (want != got) { fprintf(stderr, "line %d: FAIL setting %s expected '%s', got '%s'\n", lineNo, field.c_str(), want.c_str(), got.c_str()); g_failures++; }
     } else if (cmd == "expect-convs") {

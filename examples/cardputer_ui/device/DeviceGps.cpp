@@ -1,4 +1,5 @@
 #include "DeviceGps.h"
+#if !CPADV_DEMO
 #include <Arduino.h>
 #include <target.h>
 
@@ -74,3 +75,5 @@ void DeviceGps::loop() {
     _lastClockSync = now;
   }
 }
+
+#endif  // !CPADV_DEMO

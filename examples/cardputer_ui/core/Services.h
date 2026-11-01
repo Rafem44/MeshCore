@@ -120,8 +120,9 @@ struct UiSettings {
   int16_t utcOffsetMinutes = 60;    // France: +60 in winter, +120 in summer
   uint16_t screenTimeoutSecs = 60;  // 0 = never
   bool sound = true;
-  bool ble = false;
+  bool ble = false;                 // unused by the standalone firmware (Bluetooth = companion firmware)
   bool shareLocation = false;       // include the GPS position in adverts
+  uint8_t brightness = 1;           // 0 low, 1 medium, 2 high
 };
 
 class SettingsService {
@@ -155,10 +156,21 @@ public:
   virtual void endTile() = 0;
 };
 
+// Configuration backup on the SD card: settings, identity (private key!), contacts, channels.
+class BackupService {
+public:
+  virtual ~BackupService() {}
+  virtual bool available() = 0;                          // SD card mounted
+  virtual bool exportConfig(char* msg, size_t n) = 0;    // msg: short result for the user
+  // On success the device restarts a moment later to load the restored configuration.
+  virtual bool importConfig(char* msg, size_t n) = 0;
+};
+
 struct Services {
   MeshService* mesh;
   SystemService* sys;
   SettingsService* settings;
   GpsService* gps;
-  TileSource* tiles;
+  TileSource* tiles;    // nullptr when the firmware is built without the map
+  BackupService* backup;
 };

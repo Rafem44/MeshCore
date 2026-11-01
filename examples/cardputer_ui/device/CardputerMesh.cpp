@@ -1,4 +1,5 @@
 #include "CardputerMesh.h"
+#if !CPADV_DEMO
 #include "../core/RadioPresets.h"
 #include <LittleFS.h>
 #include <helpers/ArduinoHelpers.h>
@@ -629,3 +630,5 @@ RadioStats CardputerMesh::radioStats() {
   r.lastSnr = radio_driver.getLastSNR();
   return r;
 }
+
+#endif  // !CPADV_DEMO

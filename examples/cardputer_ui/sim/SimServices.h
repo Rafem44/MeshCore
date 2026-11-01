@@ -4,6 +4,7 @@
 // so that screenshots are reproducible. Messages are stored with the real MessageStore,
 // on host files, so persistence and reboots are tested for real.
 #include "../core/Services.h"
+#include "../core/DemoMesh.h"
 #include <deque>
 #include <string>
 #include <vector>
@@ -29,7 +30,7 @@ public:
   uint32_t virtualMillis = 0;
   DeviceStatus st;
   bool soundOn = true;
-  SimGps* gps = nullptr;
+  GpsService* gps = nullptr;
 
   SimSystem() { st.batteryPercent = 82; }
   uint32_t millis() override { return virtualMillis; }
@@ -92,60 +93,22 @@ public:
   bool save(const UiSettings& n) override;
 };
 
-class SimMesh : public MeshService {
+// "SD card" backup: keeps a copy of the settings (the device also copies identity, contacts, channels).
+class SimBackup : public BackupService {
 public:
-  SimMesh(SimSystem& sys, SimSettings& settings, Storage& storage);
-
-  // ---- scenario hooks ----
-  void addContact(const std::string& name, int hops, bool fav, uint8_t type, bool hasPos, double lat, double lon);
-  void receive(const std::string& sender, const std::string& text);                           // direct
-  void receiveChannel(const std::string& channel, const std::string& sender, const std::string& text);
-  void hear(const std::string& name, float snr);
-  void reboot();              // flush + reload the message store from the files
-  void tick();                // advances the fake network (ACKs, retries)
-  bool netAcks = true;        // contacts acknowledge direct messages
-  uint32_t netDelayMs = 1500; // ACK round trip
-  bool radioBusy = false;     // sendText fails (radio queue full)
-  int sentPackets = 0;
-  ConvKey keyByName(const std::string& name);   // conversation or contact by name
-
-  // ---- MeshService ----
-  const char* selfName() override { return _settings.get().nodeName; }
-  MessageStore& messages() override { return _store; }
-  bool sendText(const ConvKey& to, const char* text) override;
-  int maxTextLen(const ConvKey& to) override;
-  int contactCount() override { return (int)_contacts.size(); }
-  bool contactAt(int i, ContactView& out) override;
-  bool findContact(const ConvKey& key, ContactView& out) override;
-  bool setFavourite(const ConvKey& key, bool fav) override;
-  bool removeContact(const ConvKey& key) override;
-  bool resetPath(const ConvKey& key) override;
-  bool sendAdvert(bool flood, bool withPosition) override;
-  GpsService* gps = nullptr;
-  int advertsWithPosition = 0;
-  bool joinChannel(const char* name) override;
-  bool leaveChannel(const ConvKey& key) override;
-  bool pollEvent(MeshEvent& out) override;
-  int neighbours(NeighbourInfo* out, int max) override;
-  RadioStats radioStats() override;
+  explicit SimBackup(SimSettings& settings) : _settings(settings) {}
+  bool card = false;
+  int restores = 0;
+  bool available() override { return card; }
+  bool exportConfig(char* msg, size_t n) override;
+  bool importConfig(char* msg, size_t n) override;
 
 private:
-  struct Contact { ContactView v; uint32_t heardAtMs; float snr; };
-  struct Pending { ConvKey key; uint32_t seq; uint32_t deadline; uint32_t ackAt; };
-  struct Channel { ConvKey key; std::string name; };
-
-  Contact* findMut(const ConvKey& k);
-  void sortContacts();
-  void push(MeshEvent::Type t, const ConvKey& k, const std::string& title, const std::string& text);
-  void transmit(Pending& p, StoredMsg& m);
-
-  SimSystem& _sys;
   SimSettings& _settings;
-  MessageStore _store;
-  Storage& _storage;
-  std::vector<Contact> _contacts;
-  std::vector<Channel> _channels;
-  std::vector<Pending> _pending;
-  std::deque<MeshEvent> _events;
-  uint32_t _rx = 0;
+  bool _has = false;
+  UiSettings _saved;
 };
+
+// The fake network now lives in core/DemoMesh (also used by the Cardputer demo firmware).
+using SimMesh = DemoMesh;
+

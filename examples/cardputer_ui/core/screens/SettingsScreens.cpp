@@ -86,7 +86,7 @@ void TextInputScreen::draw(App&, lgfx::LovyanGFX& g) {
 // ---------------------------------------------------------------- SystemScreen
 
 namespace {
-constexpr int SYSTEM_ROWS = 11;
+constexpr int SYSTEM_ROWS = 12;
 }
 
 bool SystemScreen::onKey(App&, const KeyEvent& e) {
@@ -107,19 +107,25 @@ void SystemScreen::draw(App& app, lgfx::LovyanGFX& g) {
   char v[SYSTEM_ROWS][40];
   const char* labels[SYSTEM_ROWS] = {"Version", "Mémoire libre", "Mémoire min", "Allumé depuis",
                                      "Batterie", "Paquets reçus", "Paquets émis", "Erreurs radio",
-                                     "Dernier RSSI", "Dernier SNR", "Radio"};
+                                     "Dernier RSSI", "Dernier SNR", "Radio", "Carte SD"};
   snprintf(v[0], 40, "%s", sys.firmwareVersion());
   snprintf(v[1], 40, "%u Ko", (unsigned)(sys.freeHeap() / 1024));
   snprintf(v[2], 40, "%u Ko", (unsigned)(sys.minFreeHeap() / 1024));
   snprintf(v[3], 40, "%uj %02uh%02um%02us", (unsigned)(up / 86400), (unsigned)(up / 3600 % 24),
            (unsigned)(up / 60 % 60), (unsigned)(up % 60));
-  snprintf(v[4], 40, "%u mV", (unsigned)sys.batteryMilliVolts());
+  int pct = sys.status().batteryPercent;
+  if (pct >= 0) snprintf(v[4], 40, "%d %% (%u mV)", pct, (unsigned)sys.batteryMilliVolts());
+  else snprintf(v[4], 40, "%u mV", (unsigned)sys.batteryMilliVolts());
   snprintf(v[5], 40, "%u", (unsigned)rs.rxPackets);
   snprintf(v[6], 40, "%u", (unsigned)rs.txPackets);
   snprintf(v[7], 40, "%u", (unsigned)rs.rxErrors);
   snprintf(v[8], 40, "%.0f dBm", rs.lastRssi);
   snprintf(v[9], 40, "%.1f dB", rs.lastSnr);
   snprintf(v[10], 40, "%.3f SF%u", rs.freqMHz, rs.spreadingFactor);
+  BackupService* bk = app.services().backup;
+  TileSource* tl = app.services().tiles;
+  if (!bk || !bk->available()) snprintf(v[11], 40, "absente");
+  else snprintf(v[11], 40, "ok%s", tl ? (tl->available() ? ", carte ok" : ", sans carte") : "");
 
   _list.clamp(SYSTEM_ROWS, LIST_VISIBLE_ROWS);
   for (int i = 0; i < LIST_VISIBLE_ROWS && _list.top + i < SYSTEM_ROWS; i++) {
@@ -136,7 +142,7 @@ const uint16_t TIMEOUTS[] = {15, 30, 60, 120, 300, 0};
 constexpr int TIMEOUT_COUNT = sizeof(TIMEOUTS) / sizeof(TIMEOUTS[0]);
 const char* const LABELS[SettingsScreen::COUNT] = {
   "Nom", "Réglage radio", "  Détail", "Puissance émission", "Fuseau horaire",
-  "Veille écran", "Son", "Partager position", "Bluetooth (appli)", "Système",
+  "Veille écran", "Luminosité", "Son", "Partager position", "Sauvegarder sur SD", "Restaurer depuis SD", "Système",
 };
 }  // namespace
 
@@ -177,9 +183,9 @@ void SettingsScreen::change(App& app, int item, int delta) {
       s.screenTimeoutSecs = TIMEOUTS[(i + delta + TIMEOUT_COUNT) % TIMEOUT_COUNT];
       break;
     }
+    case BRIGHTNESS: s.brightness = (s.brightness + delta + 3) % 3; break;
     case SOUND: s.sound = !s.sound; break;
     case SHARE_LOCATION: s.shareLocation = !s.shareLocation; break;
-    case BLE: s.ble = !s.ble; break;
     default: return;
   }
   app.services().settings->save(s);
@@ -204,6 +210,24 @@ bool SettingsScreen::onKey(App& app, const KeyEvent& e) {
         app.push(&_input);
       } else if (_list.sel == SYSTEM) {
         app.push(&_system);
+      } else if (_list.sel == BACKUP || _list.sel == RESTORE) {
+        BackupService* b = app.services().backup;
+        if (!b || !b->available()) {
+          app.notify("Pas de carte SD", "Insérer une carte microSD (FAT32)", 2500);
+          return true;
+        }
+        bool restore = _list.sel == RESTORE;
+        // Restoring replaces the identity and contacts: ask twice
+        if (restore && !(_confirmItem == RESTORE && (int32_t)(app.now() - _confirmUntil) < 0)) {
+          _confirmItem = RESTORE;
+          _confirmUntil = app.now() + 3000;
+          app.notify("Remplacer la configuration ?", "Entrée encore pour confirmer", 3000);
+          return true;
+        }
+        _confirmItem = -1;
+        char msg[64];
+        bool ok = restore ? b->importConfig(msg, sizeof(msg)) : b->exportConfig(msg, sizeof(msg));
+        app.notify(ok ? (restore ? "Configuration restaurée" : "Sauvegarde faite") : "Échec", msg, 3500);
       } else {
         change(app, _list.sel, +1);
       }
@@ -231,9 +255,19 @@ void SettingsScreen::formatValue(App& app, int item, char* out, size_t n) {
       else if (s.screenTimeoutSecs < 60) snprintf(out, n, "< %u s >", s.screenTimeoutSecs);
       else snprintf(out, n, "< %u min >", s.screenTimeoutSecs / 60);
       break;
+    case BRIGHTNESS: {
+      static const char* const L[] = {"faible", "moyenne", "forte"};
+      snprintf(out, n, "< %s >", L[s.brightness < 3 ? s.brightness : 1]);
+      break;
+    }
     case SOUND: snprintf(out, n, "%s", s.sound ? "oui" : "non"); break;
     case SHARE_LOCATION: snprintf(out, n, "%s", s.shareLocation ? "oui" : "non"); break;
-    case BLE: snprintf(out, n, "%s", s.ble ? "oui" : "non"); break;
+    case BACKUP:
+    case RESTORE: {
+      BackupService* b = app.services().backup;
+      snprintf(out, n, "%s", b && b->available() ? ">" : "(pas de SD)");
+      break;
+    }
     case SYSTEM: snprintf(out, n, ">"); break;
   }
 }
@@ -244,7 +278,8 @@ void SettingsScreen::draw(App& app, lgfx::LovyanGFX& g) {
   for (int i = 0; i < LIST_VISIBLE_ROWS && _list.top + i < COUNT; i++) {
     int k = _list.top + i;
     formatValue(app, k, value, sizeof(value));
-    bool info = (k == RADIO_INFO);
+    BackupService* b = app.services().backup;
+    bool info = (k == RADIO_INFO) || ((k == BACKUP || k == RESTORE) && !(b && b->available()));
     drawListRow(g, CONTENT_Y + 1 + i * LINE_H, LABELS[k], value, k == _list.sel,
                 info ? DIM : ACCENT, info);
   }

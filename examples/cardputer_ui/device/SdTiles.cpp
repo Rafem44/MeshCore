@@ -3,29 +3,16 @@
 #if CPADV_MAP
 #include <Arduino.h>
 #include <SD.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/semphr.h>
-#include <target.h>
+#include "SdCard.h"
 
 namespace {
-SemaphoreHandle_t g_bus = nullptr;   // SPI bus lock (radio / SD)
 File g_tile;
-
-struct BusLock {
-  BusLock() { if (g_bus) xSemaphoreTakeRecursive(g_bus, portMAX_DELAY); }
-  ~BusLock() { if (g_bus) xSemaphoreGiveRecursive(g_bus); }
-};
+using BusLock = sdcard::Lock;
 }  // namespace
 
 bool SdTiles::begin() {
-  if (!g_bus) g_bus = xSemaphoreCreateRecursiveMutex();
+  if (!sdcard::begin()) return false;
   BusLock lock;
-  // 20 MHz: safe on the shared bus with short Cap wiring; SD CS is GPIO 12
-  if (!SD.begin(PIN_SD_CS, radio_spi(), 20000000)) {
-    Serial.println("[CPADV] SD: no card (map disabled, everything else works)");
-    return false;
-  }
-  Serial.printf("[CPADV] SD: card %llu MB\n", SD.cardSize() / (1024ULL * 1024ULL));
   File f = SD.open("/tiles/info.txt", FILE_READ);
   if (!f) {
     Serial.println("[CPADV] SD: no /tiles/info.txt (copy the tiles folder made by tools/tiles/make_tiles.py)");

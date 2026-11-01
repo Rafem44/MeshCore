@@ -35,7 +35,7 @@ expect-setting preset 2
 key /
 expect-setting preset 0
 
-# TX power, time zone, screen timeout, sound, Bluetooth
+# TX power, time zone, screen timeout, brightness, sound, location sharing
 key .
 key ,*3
 expect-setting tx 19
@@ -48,15 +48,29 @@ expect-setting timeout 120
 key ,*2
 expect-setting timeout 30
 key .
+key /
+expect-setting brightness 2
+key .
 key enter
 expect-setting sound 0
 key .
 key enter
 expect-setting share 1
+shot 13_settings_bottom
+
+# Backup without SD card: refused; with a card: saved, then restored after a change
 key .
 key enter
-expect-setting ble 1
-shot 13_settings_bottom
+expect-setting name Raphaël-CPADV
+sd on
+key enter
+shot 16_backup_done
+name Autre-Nom
+key .
+key enter
+key enter
+expect-setting name Raphaël-CPADV
+shot 17_restored
 
 # System screen
 key .
