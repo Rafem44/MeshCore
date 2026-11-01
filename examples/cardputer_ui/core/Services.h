@@ -108,6 +108,8 @@ public:
   virtual void beep(uint16_t freqHz, uint16_t durationMs) = 0;
   // Short notification jingles (respect the "Son" setting).
   virtual void playSound(SoundKind kind) = 0;
+  // Called by long UI operations (map rendering) so the radio keeps being served.
+  virtual void yield() {}
 };
 
 // User settings edited on the device. Persisted by the platform (LittleFS on the Cardputer).
@@ -139,9 +141,24 @@ public:
   virtual void coldRestart() = 0;      // forget the almanac / last position
 };
 
+// Offline raster map tiles (256x256, big-endian RGB565, "/tiles/<z>/<x>/<y>.bin" on the SD card).
+class TileSource {
+public:
+  virtual ~TileSource() {}
+  virtual bool available() = 0;                  // card mounted and tiles found
+  virtual bool zoomRange(int& zmin, int& zmax) = 0;
+  // Default view of the tile set (tiles/info.txt), used before the first GPS fix.
+  virtual bool hint(double& lat, double& lon) = 0;
+  virtual bool beginTile(int z, int x, int y) = 0;    // false if the tile is missing
+  // Reads `w` pixels of row `row` starting at column `x0` of the open tile.
+  virtual bool readRow(int row, int x0, int w, uint16_t* dst) = 0;
+  virtual void endTile() = 0;
+};
+
 struct Services {
   MeshService* mesh;
   SystemService* sys;
   SettingsService* settings;
   GpsService* gps;
+  TileSource* tiles;
 };

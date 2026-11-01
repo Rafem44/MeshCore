@@ -27,6 +27,8 @@
 //   nmea <sentence>                feed one NMEA sentence to the GPS parser ("$GPGGA,...*hh")
 //   nmeafile <path> [ms]           replay a recorded NMEA file, one sentence group per [ms] (default 1000)
 //   expect-gps <field> <value>     fix 0/1 | sats | lat | lon (6 decimals) | speed (km/h, 1 decimal)
+//   tiles <dir>                    use the map tiles of <dir>/tiles (made by tools/tiles/make_tiles.py)
+//   expect-tiles-read <n>          number of tile files opened so far (render cost / caching checks)
 //   nmea-bad <sentence>            the sentence must be rejected (bad checksum / malformed)
 //   expect-adverts-pos <n>         number of adverts sent with the GPS position
 //   ble on|off|connected
@@ -45,6 +47,7 @@
 #include "../core/screens/SettingsScreens.h"
 #include "../core/screens/MessagingScreens.h"
 #include "../core/screens/GpsScreens.h"
+#include "../core/screens/MapScreen.h"
 #include "../core/KeyMatrix.h"
 #include "SimServices.h"
 #include "PngWriter.h"
@@ -149,7 +152,8 @@ int main(int argc, char** argv) {
   sys.gps = &gpsSvc;
   SimMesh mesh(sys, settings, storage);
   mesh.gps = &gpsSvc;
-  Services svc{&mesh, &sys, &settings, &gpsSvc};
+  SimTiles tiles;
+  Services svc{&mesh, &sys, &settings, &gpsSvc, &tiles};
   App app(svc, g_canvas);
   KeyMatrix matrix;
 
@@ -162,7 +166,7 @@ int main(int argc, char** argv) {
   compass.setChat(&chat);
   contactDetail.setCompass(&compass);
   GpsScreen gps(compass);
-  PlaceholderScreen map("Carte", "Phase 5 : cartes hors ligne");
+  MapScreen map;
   SystemScreen systemScreen;
   SettingsScreen settingsScreen(textInput, systemScreen);
   HomeScreen home(&conversations, &contacts, &gps, &map, &settingsScreen);
@@ -282,6 +286,12 @@ int main(int argc, char** argv) {
         count++;
       }
       printf("[SIM] replayed %d NMEA sentences from %s\n", count, path.c_str());
+    } else if (cmd == "tiles") {
+      std::string d; ls >> d;
+      if (!tiles.open(d)) { fprintf(stderr, "line %d: no tiles in %s\n", lineNo, d.c_str()); g_failures++; }
+    } else if (cmd == "expect-tiles-read") {
+      int want = 0; ls >> want;
+      if (want != tiles.tilesRead) { fprintf(stderr, "line %d: FAIL expected %d tile reads, got %d\n", lineNo, want, tiles.tilesRead); g_failures++; }
     } else if (cmd == "nmea-bad") {
       std::string s = rest(ls);
       if (gpsSvc.feed(s)) { fprintf(stderr, "line %d: FAIL NMEA sentence accepted: %s\n", lineNo, s.c_str()); g_failures++; }

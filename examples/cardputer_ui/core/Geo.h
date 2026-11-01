@@ -29,3 +29,32 @@ inline const char* compassLabel(double deg) {
 }
 
 }  // namespace geo
+
+// ---- Web Mercator (slippy map tiles, 256 px) ----
+namespace geo {
+
+constexpr int TILE_SIZE = 256;
+
+// Global pixel coordinates of a position at zoom z (0..2^z*256).
+inline void toPixel(double lat, double lon, int z, double& px, double& py) {
+  if (lat > 85.0511) lat = 85.0511;
+  if (lat < -85.0511) lat = -85.0511;
+  double n = (double)(1u << z) * TILE_SIZE;
+  px = (lon + 180.0) / 360.0 * n;
+  double s = sin(lat * DEG);
+  py = (0.5 - log((1 + s) / (1 - s)) / (4 * 3.14159265358979323846)) * n;
+}
+
+inline void fromPixel(double px, double py, int z, double& lat, double& lon) {
+  double n = (double)(1u << z) * TILE_SIZE;
+  lon = px / n * 360.0 - 180.0;
+  double y = 3.14159265358979323846 * (1 - 2 * py / n);
+  lat = atan(sinh(y)) / DEG;
+}
+
+// Ground resolution in metres per pixel at a latitude.
+inline double metersPerPixel(double lat, int z) {
+  return 156543.03392 * cos(lat * DEG) / (double)(1u << z);
+}
+
+}  // namespace geo

@@ -53,7 +53,11 @@ $(BUILD)/sim/%.o: %.cpp $(LGFX_STAMP) $(wildcard *.h ../core/*.h ../core/screens
 $(BUILD)/cardputer_sim: $(APP_OBJ) $(LGFX_LIB)
 	$(CXX) -o $@ $(APP_OBJ) $(LGFX_LIB) -lpthread -Wl,--gc-sections
 
-run: $(BUILD)/cardputer_sim
+TILES_STAMP := $(BUILD)/maptiles/tiles/info.txt
+$(TILES_STAMP): ../../../tools/tiles/make_tiles.py
+	python3 ../../../tools/tiles/make_tiles.py --center 43.6116 1.3346 --radius-km 1.5 --zooms 13-15 --synthetic --out $(BUILD)/maptiles
+
+run: $(BUILD)/cardputer_sim $(TILES_STAMP)
 	@mkdir -p $(BUILD)/shots
 	@set -e; for s in $(SCENARIOS); do echo "== $$s"; $(BUILD)/cardputer_sim $$s $(BUILD)/shots; done
 

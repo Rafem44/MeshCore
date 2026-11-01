@@ -19,7 +19,11 @@ bool HomeScreen::onKey(App& app, const KeyEvent& e) {
   if (e.is('m')) { app.push(_messages); return true; }
   if (e.is('c')) { app.push(_contacts); return true; }
   if (e.is('g')) { app.push(_gps); return true; }
-  if (e.is('k')) { app.push(_map); return true; }
+  if (e.is('k')) {
+    if (_map) app.push(_map);
+    else app.notify("Carte non incluse", "Firmware sans carte (version _map en option)", 2500);
+    return true;
+  }
   if (e.is('s')) { app.push(_settings); return true; }
   return false;
 }
@@ -28,6 +32,10 @@ bool HomeScreen::tick(App& app) {
   int unread = app.services().mesh->unreadCount();
   bool changed = unread != _lastUnread;
   _lastUnread = unread;
+  if (app.now() - _lastRefresh >= 5000) {   // neighbour ages ("12 s")
+    _lastRefresh = app.now();
+    changed = true;
+  }
   return changed;
 }
 

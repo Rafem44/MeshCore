@@ -77,11 +77,20 @@ bool App::loop() {
   if (_bannerUntil && !bannerVisible()) { _bannerUntil = 0; _dirty = true; }
   Screen* s = top();
   if (s && s->tick(*this)) _dirty = true;
-  // Status bar shows a clock: refresh at least once per second.
-  if (now() - _lastStatusDraw >= 1000) _dirty = true;
-  if (!_dirty) return false;
-  drawAll();
-  return true;
+  if (_dirty) {
+    drawAll();
+    return true;
+  }
+  // Status bar shows a clock: refresh it alone once per second (no content redraw:
+  // the map would otherwise be re-read from the SD card every second).
+  if (now() - _lastStatusDraw >= 1000) {
+    _lastStatusDraw = now();
+    _g.startWrite();
+    drawStatusBar();
+    _g.endWrite();
+    return true;
+  }
+  return false;
 }
 
 void App::drawAll() {

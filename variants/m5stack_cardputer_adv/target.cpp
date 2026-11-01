@@ -6,6 +6,7 @@ CardputerBoard board;
 // Radio SPI: the SD card shares this bus (CS 12, kept high by CardputerBoard::begin).
 // The display uses its own SPI host (SPI3), configured by M5GFX.
 static SPIClass spi;
+SPIClass& radio_spi() { return spi; }
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
 
 WRAPPER_CLASS radio_driver(radio, board);

@@ -31,8 +31,11 @@ public:
   const char* firmwareVersion() override { return CPADV_VERSION; }
   void beep(uint16_t freqHz, uint16_t durationMs) override;
   void playSound(SoundKind kind) override;
+  void yield() override { if (_yield) _yield(); }
+  void setYieldHook(void (*fn)()) { _yield = fn; }
 
 private:
   DeviceSettings& _settings;
   GpsService& _gps;
+  void (*_yield)() = nullptr;
 };

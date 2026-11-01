@@ -82,3 +82,17 @@ Il faut un **second nœud MeshCore** (téléphone + appli avec un autre appareil
       orienté nord pour vérifier). En marchant : la flèche est relative à la direction de marche.
 - [ ] `,` `/` dans la boussole passent d'un contact à l'autre.
 - [ ] `R` deux fois sur l'écran GPS : redémarrage à froid (log `cold restart sent`), le fix revient.
+
+## Phase 5 — carte hors ligne (`cardputer_adv_standalone_map`, en option)
+
+- [ ] Sans carte SD : le log indique `SD: no card (map disabled, everything else works)` ; `K` affiche la
+      grille avec « Pas de carte sur la SD » ; messagerie et GPS fonctionnent normalement.
+- [ ] Préparer la carte SD avec `tools/tiles` (voir `tools/tiles/README.md`) puis redémarrer :
+      log `SD: map tiles zoom 12-15 around ...`.
+- [ ] `K` : la carte s'affiche centrée sur ta position (ou sur la zone si pas encore de fix GPS).
+- [ ] `=` / `-` zooment, `;` `.` `,` `/` déplacent, `0` recentre sur toi. Chaque affichage en moins de 300 ms
+      (impression visuelle ; la durée est mesurée par le firmware).
+- [ ] Ta position (point bleu) et les contacts qui partagent la leur (triangles orange) sont au bon endroit.
+- [ ] **Pendant l'affichage de la carte, un message envoyé par le second nœud arrive quand même**
+      (la radio et la carte SD partagent le même bus).
+- [ ] Le firmware sans carte (`cardputer_adv_standalone`) : `K` affiche « Carte non incluse ».

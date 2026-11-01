@@ -29,6 +29,38 @@ bool SimStorage::write(const char* path, uint32_t off, const void* buf, uint32_t
 
 bool SimStorage::remove(const char* path) { return ::remove(full(path).c_str()) == 0; }
 
+// ------------------------------------------------------------------ SimTiles
+
+bool SimTiles::open(const std::string& dir) {
+  _dir = dir;
+  _ok = false;
+  tilesRead = rowsRead = 0;
+  FILE* f = fopen((dir + "/tiles/info.txt").c_str(), "r");
+  if (!f) return false;
+  _ok = fscanf(f, "%lf %lf %d %d", &_lat, &_lon, &_zmin, &_zmax) == 4;
+  fclose(f);
+  return _ok;
+}
+
+bool SimTiles::beginTile(int z, int x, int y) {
+  char p[64];
+  snprintf(p, sizeof(p), "/tiles/%d/%d/%d.bin", z, x, y);
+  _f = fopen((_dir + p).c_str(), "rb");
+  if (_f) tilesRead++;
+  return _f != nullptr;
+}
+
+bool SimTiles::readRow(int row, int x0, int w, uint16_t* dst) {
+  if (!_f || fseek(_f, (row * 256 + x0) * 2, SEEK_SET) != 0) return false;
+  rowsRead++;
+  return fread(dst, 2, w, _f) == (size_t)w;
+}
+
+void SimTiles::endTile() {
+  if (_f) fclose(_f);
+  _f = nullptr;
+}
+
 // ------------------------------------------------------------------ SimSystem / SimSettings
 
 DeviceStatus SimSystem::status() {

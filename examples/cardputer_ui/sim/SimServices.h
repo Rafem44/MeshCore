@@ -64,6 +64,26 @@ private:
   bool _present = false;
 };
 
+// Map tiles from a host folder (same layout as the SD card: <dir>/tiles/<z>/<x>/<y>.bin).
+class SimTiles : public TileSource {
+public:
+  bool open(const std::string& dir);   // reads <dir>/tiles/info.txt
+  bool available() override { return _ok; }
+  bool zoomRange(int& zmin, int& zmax) override { zmin = _zmin; zmax = _zmax; return _ok; }
+  bool hint(double& lat, double& lon) override { lat = _lat; lon = _lon; return _ok; }
+  bool beginTile(int z, int x, int y) override;
+  bool readRow(int row, int x0, int w, uint16_t* dst) override;
+  void endTile() override;
+  int tilesRead = 0, rowsRead = 0;
+
+private:
+  std::string _dir;
+  bool _ok = false;
+  int _zmin = 0, _zmax = 0;
+  double _lat = 0, _lon = 0;
+  FILE* _f = nullptr;
+};
+
 class SimSettings : public SettingsService {
 public:
   UiSettings s;

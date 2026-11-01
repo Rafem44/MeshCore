@@ -25,4 +25,6 @@ extern EnvironmentSensorManager sensors;
 #endif
 
 bool radio_init();
+// SPI bus shared by the SX1262 and the SD card (SCK 40 / MOSI 14 / MISO 39)
+SPIClass& radio_spi();
 mesh::LocalIdentity radio_new_identity();

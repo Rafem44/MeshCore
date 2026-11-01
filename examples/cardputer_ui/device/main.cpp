@@ -15,7 +15,11 @@
 #include "CardputerMesh.h"
 #include "DeviceGps.h"
 #include "DeviceServices.h"
+#include "SdTiles.h"
 #include "Tca8418Keyboard.h"
+#if CPADV_MAP
+  #include "../core/screens/MapScreen.h"
+#endif
 
 static M5Canvas canvas(&M5.Display);   // the single 240x135 RGB565 framebuffer (64.8 KB)
 static Tca8418Keyboard keyboard;
@@ -27,7 +31,13 @@ static DeviceSystem sys(settings, gpsDev);
 static StdRNG fastRng;
 static SimpleMeshTables tables;
 static CardputerMesh meshNode(radio_driver, fastRng, rtc_clock, tables, settings);
-static App app(Services{&meshNode, &sys, &settings, &gpsDev}, canvas);
+#if CPADV_MAP
+static SdTiles sdTiles;
+static MapScreen mapScreen;
+static App app(Services{&meshNode, &sys, &settings, &gpsDev, &sdTiles}, canvas);
+#else
+static App app(Services{&meshNode, &sys, &settings, &gpsDev, nullptr}, canvas);
+#endif
 
 static TextInputScreen textInput;
 static ChatScreen chatScreen;
@@ -36,10 +46,13 @@ static ContactsScreen contactsScreen(chatScreen, contactDetail);
 static ConversationsScreen conversations(chatScreen, contactsScreen, textInput);
 static CompassScreen compassScreen;
 static GpsScreen gpsScreen(compassScreen);
-static PlaceholderScreen mapScreen("Carte", "Phase 5 : cartes hors ligne");
 static SystemScreen systemScreen;
 static SettingsScreen settingsScreen(textInput, systemScreen);
+#if CPADV_MAP
 static HomeScreen home(&conversations, &contactsScreen, &gpsScreen, &mapScreen, &settingsScreen);
+#else
+static HomeScreen home(&conversations, &contactsScreen, &gpsScreen, nullptr, &settingsScreen);   // map not built in
+#endif
 
 static uint32_t lastActivity = 0;
 static bool screenAsleep = false;
@@ -86,6 +99,9 @@ void setup() {
     bootAdvertAt = millis() + 3000;   // let the radio settle, then announce ourselves
   }
 
+#if CPADV_MAP
+  sdTiles.begin();   // optional: without a card the map screen shows a notice
+#endif
   gpsDev.begin();   // the GPS UART is ours: EnvironmentSensorManager is not started
   meshNode.setGps(&gpsDev);
   compassScreen.setChat(&chatScreen);
@@ -100,6 +116,7 @@ void setup() {
     Serial.println("[CPADV] ERROR: cannot allocate the 64.8 KB framebuffer");
   }
 
+  sys.setYieldHook([] { meshNode.loop(); });   // long renders (map) keep the radio served
   app.begin(&home);
   if (!radioReady) app.notify("Radio absente", "Vérifier le Cap LoRa et l'antenne", 8000);
   lastActivity = millis();

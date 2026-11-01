@@ -46,6 +46,7 @@ jobs:
         environment:
           - cardputer_adv_companion_ble
           - cardputer_adv_standalone
+          - cardputer_adv_standalone_map
     steps:
       - uses: actions/checkout@v6
 
