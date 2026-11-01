@@ -96,3 +96,26 @@ Il faut un **second nœud MeshCore** (téléphone + appli avec un autre appareil
 - [ ] **Pendant l'affichage de la carte, un message envoyé par le second nœud arrive quand même**
       (la radio et la carte SD partagent le même bus).
 - [ ] Le firmware sans carte (`cardputer_adv_standalone`) : `K` affiche « Carte non incluse ».
+
+## Phase 6 — finitions
+
+### Démo sans module LoRa (`cardputer_adv_demo`)
+
+- [ ] Au démarrage : bandeau « Mode démo », log `DEMO mode: no radio, simulated contacts and GPS`.
+- [ ] Bob a laissé un message de bienvenue ; lui répondre : « reçu » puis sa réponse quelques secondes après.
+- [ ] Toutes les 1 à 2 minutes : un message sur Public, un message privé ou un voisin entendu (bandeau + son).
+- [ ] `G` : « recherche » puis fix au bout de 20 s ; la position tourne autour de Colomiers.
+- [ ] Contacts : distances affichées ; boussole vers Bob (Toulouse, ~9 km à l'est).
+- [ ] Le son des notifications sort du haut-parleur ; Réglages > Son = non le coupe.
+
+### Pour tous les firmwares autonomes
+
+- [ ] Réglages > Luminosité : faible / moyenne / forte change immédiatement l'écran.
+- [ ] Sans carte SD : « Sauvegarder sur SD » est grisé (« pas de SD »).
+- [ ] Avec carte SD : Sauvegarder → bandeau « Sauvegarde faite » ; le fichier `cardputer_backup.bin` est sur la SD.
+- [ ] Changer le nom, puis Restaurer (Entrée deux fois) → redémarrage, l'ancien nom et les contacts reviennent.
+- [ ] Après un flash complet + restauration : **la même identité** (les autres nœuds te reconnaissent).
+- [ ] Écran éteint : log `screen off, CPU 80 MHz`, puis une touche le rallume normalement.
+- [ ] Autonomie : charger à 100 %, laisser tourner une journée d'usage normal, noter le % de la ligne
+      `bat` du log toutes les heures (ou Réglages > Système).
+- [ ] Batterie à 10 % : bandeau « Batterie faible » et son grave, une seule fois.

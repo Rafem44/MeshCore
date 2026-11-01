@@ -47,6 +47,7 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 - cardputer_adv_companion_ble : firmware companion officiel (appli téléphone), écran companion zoomé.
 - cardputer_adv_standalone : firmware autonome, UI examples/cardputer_ui (core/ + device/), sans carte.
 - cardputer_adv_standalone_map : idem + carte hors ligne sur SD (option voulue par l'utilisateur).
+- cardputer_adv_demo : Cardputer seul, sans Cap : réseau et GPS simulés (DemoMesh / DemoGps), carte incluse.
 - Écran, clavier (I2C interne 8/9), son, batterie via M5Unified/M5GFX ; Wire = port Grove (2/1).
 - Firmware autonome : le GPS (Serial1) est lu par device/DeviceGps, EnvironmentSensorManager n'est pas démarré.
 
@@ -65,7 +66,14 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
    core/Nmea (parseur partagé), device/DeviceGps (UART, détection baud, horloge), écrans GPS + boussole.
 5. Cartes hors ligne (tuiles RGB565 sur SD) — EN OPTION : env cardputer_adv_standalone_map (CPADV_MAP=1).
    tools/tiles/make_tiles.py (url autorisée / mbtiles / synthetic), core/screens/MapScreen, device/SdTiles.
-6. Finitions, veille, export/import config, rebase upstream.
+6. Finitions — fait côté code : démo sans LoRa (env cardputer_adv_demo, core/DemoMesh + DemoGps), sauvegarde /
+   restauration SD (device/DeviceBackup), luminosité, CPU 80 MHz écran éteint, alerte batterie, Releases sur tag
+   cardputer-v*. Notice : examples/cardputer_ui/FLASH.md. Upstream à jour au 2026-11-02 (rien à intégrer).
+
+## Suivre MeshCore officiel
+- `git remote add upstream https://github.com/meshcore-dev/MeshCore.git && git fetch upstream main`
+- `git merge upstream/main` dans cardputer-adv (pas de rebase : pas de force-push sur la branche partagée),
+  puis compiler les 5 envs en CI et relancer le simulateur. Le code spécifique ne touche pas src/.
 
 ## Références
 Portages existants à étudier sans copier aveuglément :

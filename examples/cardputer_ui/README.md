@@ -2,6 +2,10 @@
 
 Interface utilisateur du firmware MeshCore autonome pour le M5Stack Cardputer ADV + Cap LoRa.
 
+- Installer : [FLASH.md](FLASH.md) (choix du fichier, flash dans le navigateur, touches)
+- Tester sur le matériel : [TESTS.md](TESTS.md)
+- Cartes hors ligne : [../../tools/tiles/README.md](../../tools/tiles/README.md)
+
 ```
 core/            UI portable (identique sur le Cardputer et dans le simulateur)
   Services.h     seule frontière avec le reste du firmware (mesh, système, GPS...)
@@ -9,6 +13,10 @@ core/            UI portable (identique sur le Cardputer et dans le simulateur)
   App.*          pile d'écrans, barre d'état, ligne d'aide, routage clavier
   Theme.h        dimensions, couleurs, polices (Latin-1, accents français)
   screens/       un fichier par écran
+  MessageStore.* historique des messages (fichiers anneau, partagé appareil / simulateur)
+  Nmea.*         lecture des trames GPS
+  DemoMesh.*     faux réseau (simulateur + firmware démo), DemoGps.* faux GPS
+device/          code propre au Cardputer : radio MeshCore, GPS, clavier, SD, sauvegarde
 sim/             simulateur PC sans écran, piloté par scénarios, captures PNG
 ```
 
