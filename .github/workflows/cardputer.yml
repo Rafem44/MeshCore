@@ -44,9 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         environment:
-          # Reference build on an existing ESP32-S3 + SX1262 board, proves the toolchain works.
-          # The Cardputer envs are added here in phase 1.
-          - Heltec_v3_companion_radio_ble
+          - cardputer_adv_companion_ble
     steps:
       - uses: actions/checkout@v6
 
