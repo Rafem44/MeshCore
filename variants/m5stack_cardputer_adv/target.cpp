@@ -18,7 +18,10 @@ EnvironmentSensorManager sensors(gps);
 
 #ifdef DISPLAY_CLASS
   DISPLAY_CLASS display;
-  MomentaryButton user_btn(PIN_USER_BTN, 1000, true);
+  CardputerKeyButton user_btn(CardputerKeyButton::ENTER, PIN_USER_BTN);   // keyboard Enter + G0 button
+  CardputerKeyButton joystick_left(CardputerKeyButton::LEFT);
+  CardputerKeyButton joystick_right(CardputerKeyButton::RIGHT);
+  CardputerKeyButton back_btn(CardputerKeyButton::BACK);
 #endif
 
 bool radio_init() {

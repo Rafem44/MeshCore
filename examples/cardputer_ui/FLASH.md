@@ -86,3 +86,15 @@ Avant de changer de firmware : *Réglages → Sauvegarder sur SD*. Après le fla
 | Fn + `;` `.` | défiler dans une discussion |
 | Fn + `` ` `` | retour depuis un écran de saisie |
 | Alt + `e` (`a`, `i`, `o`, `u`, `c`) | lettres accentuées : é, puis è ê ë en rappuyant |
+
+### Firmware companion (`cardputer_adv_companion_ble`)
+
+L'écran du companion a plusieurs pages (les petits points sous le titre) :
+
+| Touche | Action |
+| --- | --- |
+| `/` ou `.` | page suivante |
+| `,` ou `;` | page précédente |
+| Entrée (ou le bouton G0 sur le côté) | action de la page (« press Enter ») |
+
+Pour appairer l'appli : aller sur la page Bluetooth, le code PIN est affiché.

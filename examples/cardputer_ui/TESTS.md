@@ -20,6 +20,9 @@ que le firmware a détecté.
 - [ ] Si Cap 1262 : la ligne `PI4IOE dir=... -> P0 HIGH (ok)`.
 - [ ] La ligne `[CPADV] SX1262 OK: 869.618 MHz ...`. Sinon, noter le code d'erreur affiché juste avant.
 - [ ] L'écran affiche l'interface MeshCore (texte lisible, pas à l'envers, pas décalé).
+- [x] Réception radio : relais et nœuds du réseau entendus (validé : relais de Paris).
+- [x] L'écran du companion s'affiche (validé). Après la v0.6.1 : plus de bords coupés, texte net (zoom x2).
+- [ ] Clavier : `/` et `.` page suivante, `,` et `;` page précédente, Entrée = action de la page.
 - [ ] L'appli MeshCore sur le téléphone trouve l'appareil en Bluetooth ; le code PIN s'affiche sur l'écran.
 - [ ] Un message envoyé depuis le téléphone (via le Cardputer) est reçu par un autre nœud, et inversement.
 - [ ] Le niveau de batterie affiché dans l'appli est plausible (3,3 à 4,2 V).

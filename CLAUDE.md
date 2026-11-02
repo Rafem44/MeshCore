@@ -14,6 +14,9 @@ avec un mode BLE companion optionnel. Le code réseau de MeshCore n'est jamais m
   - firmware : `pio run -e <env>` (voir la note réseau ci-dessous)
 - Rapporter RAM statique et taille flash après chaque build ; alerte si RAM > 70 %.
 - Pas de PSRAM : aucun double buffer, aucun malloc > 32 Ko. Un seul framebuffer 240x135 RGB565 (64,8 Ko).
+- Écran : agrandissements en facteur ENTIER uniquement, et 2-3 px de marge le long des bords (le cadre et
+  l'arrondi coupent les colonnes extrêmes). Ce qui n'est pas rendu par le simulateur (écran du companion)
+  doit être signalé comme non vérifié.
 - Le SPI est partagé radio/SD : tout accès SD passe par un mutex.
 - Ajouter des logs série préfixés [CPADV] pour tout ce qui touche au matériel.
 - L'utilisateur teste lui-même sur le matériel ; fournir une checklist de test à la fin de chaque phase.
@@ -47,7 +50,9 @@ GPS UART : ESP TX 13, ESP RX 15. Clavier TCA8418 : SDA 8, SCL 9, INT 11.
 SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 
 ## Envs PlatformIO
-- cardputer_adv_companion_ble : firmware companion officiel (appli téléphone), écran companion zoomé.
+- cardputer_adv_companion_ble : firmware companion officiel (appli téléphone). Écran companion 120x64 zoom x2
+  (CardputerDisplay) ; clavier branché sur ses « boutons » via CardputerKeys (UI_HAS_JOYSTICK) :
+  , ; page précédente, / . page suivante, Entrée action, ` sélection. Validé sur matériel : radio RX + écran.
 - cardputer_adv_standalone : firmware autonome, UI examples/cardputer_ui (core/ + device/), sans carte.
 - cardputer_adv_standalone_map : idem + carte hors ligne sur SD (option voulue par l'utilisateur).
 - cardputer_adv_demo : Cardputer seul, sans Cap : réseau et GPS simulés (DemoMesh / DemoGps), carte incluse.
@@ -63,7 +68,8 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 
 ## Feuille de route
 0. Socle, CI, simulateur — fait.
-1. Bring-up matériel (variante, radio, PI4IOE, écran, companion BLE) — compile, à valider sur matériel.
+1. Bring-up matériel (variante, radio, PI4IOE, écran, companion BLE) — RÉCEPTION RADIO ET ÉCRAN VALIDÉS sur le
+   Cardputer de l'utilisateur (relais de Paris reçus). Reste : émission, appairage BLE, log de démarrage.
 2. Clavier TCA8418 + squelette d'UI (accueil, barre d'état, réglages) — compile + simulateur OK,
    à valider sur matériel. Checklist : examples/cardputer_ui/TESTS.md.
 3. Messagerie autonome + persistance LittleFS + son — compile + simulateur OK, à valider sur matériel.

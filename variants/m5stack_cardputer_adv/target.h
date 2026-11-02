@@ -11,7 +11,7 @@
 #include <helpers/sensors/MicroNMEALocationProvider.h>
 #ifdef DISPLAY_CLASS
   #include <CardputerDisplay.h>
-  #include <helpers/ui/MomentaryButton.h>
+  #include <CardputerKeys.h>
 #endif
 
 extern CardputerBoard board;
@@ -21,7 +21,11 @@ extern EnvironmentSensorManager sensors;
 
 #ifdef DISPLAY_CLASS
   extern DISPLAY_CLASS display;
-  extern MomentaryButton user_btn;
+  // Keyboard-driven "buttons" for the companion UI (UI_HAS_JOYSTICK): see CardputerKeys.h
+  extern CardputerKeyButton user_btn;
+  extern CardputerKeyButton joystick_left;
+  extern CardputerKeyButton joystick_right;
+  extern CardputerKeyButton back_btn;
 #endif
 
 bool radio_init();
