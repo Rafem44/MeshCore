@@ -36,6 +36,9 @@ avec un mode BLE companion optionnel. Le code réseau de MeshCore n'est jamais m
   dans ce cas `pio run` échoue avec HTTPClientError. Se fier à la CI, ou demander à l'utilisateur
   d'autoriser ces domaines dans les réglages réseau de l'environnement.
 - Lire l'état de la CI : `curl -s https://api.github.com/repos/Rafem44/MeshCore/actions/runs?branch=cardputer-adv`.
+- **Pousser peu souvent** : regrouper les changements en un commit testé (simulateur OK) avant de pousser.
+  Trop de pushes rapprochés ont déjà fait suspendre les GitHub Actions du dépôt (réactivées à la main par
+  l'utilisateur). Pas de commit vide pour « relancer » la CI : demander à l'utilisateur « Run workflow ».
 
 ## Brochage
 SX1262 : NSS 5, DIO1 4, RST 3, BUSY 6, SCK 40, MOSI 14, MISO 39,
