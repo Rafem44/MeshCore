@@ -72,6 +72,9 @@ public:
   static constexpr int MAX_MSGS = 64;
 
   void begin(Storage* st);
+  // Max conversations kept with a history file (<= MAX_CONVS), from the free flash space.
+  void setCapacity(int convs) { _capacity = convs < 4 ? 4 : convs > MAX_CONVS ? MAX_CONVS : convs; }
+  int capacity() const { return _capacity; }
 
   // Creates the conversation if needed (channels are listed even without messages).
   ConvMeta* ensure(const ConvKey& k, const char* name);
@@ -104,6 +107,7 @@ private:
   ConvMeta _convs[MAX_CONVS];
   uint8_t _order[MAX_CONVS] = {};
   int _count = 0;
+  int _capacity = MAX_CONVS;
   bool _dirty = false;
   bool _sorted = false;
 };

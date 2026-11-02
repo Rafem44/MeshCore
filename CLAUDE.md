@@ -50,6 +50,9 @@ SD CS 12. Batterie ADC 10. Écran ST7789V2 240x135.
 - cardputer_adv_demo : Cardputer seul, sans Cap : réseau et GPS simulés (DemoMesh / DemoGps), carte incluse.
 - Écran, clavier (I2C interne 8/9), son, batterie via M5Unified/M5GFX ; Wire = port Grove (2/1).
 - Firmware autonome : le GPS (Serial1) est lu par device/DeviceGps, EnvironmentSensorManager n'est pas démarré.
+- Table de partitions autonome/démo : variants/m5stack_cardputer_adv/partitions_cpadv_8mb.csv (app 2,5 Mo,
+  LittleFS 5,4 Mo déclarés > 5 Mo pour que M5Launcher donne toute la place libre). Vérif : tools/launcher_check.py
+  (lancé en CI). MessageStore::setCapacity adapte le nombre de conversations à la taille réelle de LittleFS.
 
 ## Clavier (convention UI)
 Écrans sans saisie : `;` `.` `,` `/` = flèches haut/bas/gauche/droite, `` ` `` = Échap.

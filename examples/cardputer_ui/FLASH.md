@@ -30,8 +30,38 @@
 En ligne de commande, c'est équivalent :
 
 ```bash
-esptool.py --chip esp32s3 write_flash 0x0 cardputer_adv_demo-0.6.0.bin
+esptool.py --chip esp32s3 write_flash 0x0 cardputer_adv_demo-v0.6.1.bin
 ```
+
+## 3 bis. Autres façons d'installer
+
+### Avec M5Burner (l'outil officiel M5Stack)
+
+Les fichiers `.bin` de la release sont des images complètes, comme celles que M5Burner flashe.
+
+1. Ouvrir M5Burner, choisir l'appareil **Cardputer**.
+2. Section des firmwares personnalisés (*Custom* / *User Custom*, compte M5Stack nécessaire) :
+   ajouter le fichier `.bin`, adresse **0x0**.
+3. Le garder privé ou le partager avec un code de partage (pratique pour donner la démo à quelqu'un).
+
+### Avec M5Launcher (lanceur d'applis sur carte SD)
+
+Pour ceux qui ont déjà M5Launcher sur leur Cardputer : on garde le lanceur et ses autres applis.
+
+1. Copier le fichier `.bin` de la release (le même que pour ESPConnect) sur la carte SD.
+2. Dans M5Launcher : *SD* → choisir le fichier → installer.
+3. Le lanceur crée tout seul la zone de stockage du firmware (messages, contacts, réglages) avec
+   **toute la place libre** de la mémoire. Le journal série affiche au démarrage
+   `storage ... KB -> up to N conversations kept` : avec très peu de place, le Cardputer garde
+   moins de conversations, mais tout fonctionne.
+4. Avant de réinstaller ou de changer d'appli : *Réglages → Sauvegarder sur SD*, car M5Launcher peut
+   effacer la zone de stockage.
+
+Vérifier un fichier avant de le copier (facultatif, sur PC) :
+`python3 tools/launcher_check.py cardputer_adv_demo-v0.6.1.bin` doit afficher « Launcher compatibility: OK ».
+
+> Le firmware companion (`cardputer_adv_companion_ble`) garde le découpage officiel de MeshCore :
+> sous M5Launcher il n'aurait que 448 Ko de stockage (assez pour lui, il garde peu de données).
 
 ## 4. Voir les messages de diagnostic (pour les tests)
 

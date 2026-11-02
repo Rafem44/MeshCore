@@ -89,7 +89,7 @@ ConvMeta* MessageStore::ensure(const ConvKey& k, const char* name) {
     if (name && *name && strcmp(c->name, name) != 0) { utf8Copy(c->name, sizeof(c->name), name); _dirty = true; }
     return c;
   }
-  if (_count == MAX_CONVS) {
+  if (_count >= _capacity) {
     // Full: forget the direct conversation with the oldest activity (channels are kept).
     int victim = -1;
     for (int i = 0; i < _count; i++) {

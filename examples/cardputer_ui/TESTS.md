@@ -119,3 +119,11 @@ Il faut un **second nœud MeshCore** (téléphone + appli avec un autre appareil
 - [ ] Autonomie : charger à 100 %, laisser tourner une journée d'usage normal, noter le % de la ligne
       `bat` du log toutes les heures (ou Réglages > Système).
 - [ ] Batterie à 10 % : bandeau « Batterie faible » et son grave, une seule fois.
+
+### Installation par M5Burner et M5Launcher
+
+- [ ] M5Burner : un `.bin` de la release ajouté en firmware personnalisé (adresse 0x0) démarre normalement.
+- [ ] M5Launcher : copier `cardputer_adv_demo-v0.6.1.bin` sur la SD, l'installer depuis le lanceur.
+      Le firmware démarre ; log `storage ... KB -> up to N conversations kept` avec plusieurs Mo.
+- [ ] Sous M5Launcher : envoyer quelques messages, éteindre/rallumer : l'historique est conservé.
+- [ ] Revenir au lanceur puis relancer le firmware : réglages et messages toujours là.

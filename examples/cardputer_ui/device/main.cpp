@@ -159,6 +159,14 @@ void setup() {
   Serial.printf("[CPADV] LittleFS %u / %u KB used\n", (unsigned)(LittleFS.usedBytes() / 1024),
                 (unsigned)(LittleFS.totalBytes() / 1024));
   settings.load();
+  {
+    // ~16 KB of flash per conversation history (64 messages + file system overhead)
+    int total = (int)(LittleFS.totalBytes() / 1024);
+    int convs = (total - 96) / 16;
+    meshNode.messages().setCapacity(convs);
+    Serial.printf("[CPADV] storage %d KB -> up to %d conversations kept\n", total,
+                  meshNode.messages().capacity());
+  }
 
 #if CPADV_DEMO
   gpsProxy.target = &gpsDev;

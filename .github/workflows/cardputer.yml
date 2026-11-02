@@ -81,6 +81,12 @@ jobs:
             echo "**Warning: static RAM above the 70% budget.**" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: M5Launcher compatibility
+        if: matrix.environment != 'cardputer_adv_companion_ble'
+        run: |
+          python3 tools/launcher_check.py .pio/build/${{ matrix.environment }}/firmware-merged.bin --strict | tee launcher.txt
+          { echo '```'; cat launcher.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Collect binaries
         run: |
           mkdir -p out
