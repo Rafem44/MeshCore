@@ -11,7 +11,7 @@ ColorVal UIColor::popup_bkg = 0x07FF;
 ColorVal UIColor::popup_txt = 0x0000;
 ColorVal UIColor::corp_blue = 0x001A;
 
-static constexpr float ZOOM = 240.0f / 128.0f;
+static constexpr float ZOOM = 2.0f;   // integer zoom: crisp text, no clipped columns
 
 bool CardputerDisplay::begin() {
   M5.Display.setRotation(1);

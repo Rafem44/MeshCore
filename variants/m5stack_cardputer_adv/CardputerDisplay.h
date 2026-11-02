@@ -1,14 +1,15 @@
 #pragma once
 // DisplayDriver for the official companion UI (examples/companion_radio/ui-new) on the
 // Cardputer ADV ST7789V2 240x135 panel, through M5GFX (initialised by M5.begin()).
-// The companion UI is laid out for a 128x64 screen: it is drawn into a small 8-bit sprite
-// (8 KB of RAM) and scaled x1.875 to fill the panel width.
+// The companion UI is laid out for small 128x64 screens and uses display.width() for its
+// layout: it is drawn into a 120x64 8-bit sprite (7.5 KB of RAM) scaled exactly x2 to
+// 240x128, so every pixel is a clean 2x2 block and nothing touches the panel edges.
 #include <helpers/ui/DisplayDriver.h>
 #include <M5Unified.h>
 
 class CardputerDisplay : public DisplayDriver {
 public:
-  CardputerDisplay() : DisplayDriver(128, 64), _canvas(&M5.Display) {}
+  CardputerDisplay() : DisplayDriver(120, 64), _canvas(&M5.Display) {}
   bool begin();
   bool isOn() override { return _isOn; }
   void turnOn() override;
